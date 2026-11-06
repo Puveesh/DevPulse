@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
@@ -25,6 +25,15 @@ export function StartSessionModal({ isOpen, onClose, defaultProjectId }: StartSe
   const [title, setTitle] = useState('');
   const [initialNotes, setInitialNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setProjectId(defaultProjectId || '');
+      setTitle('');
+      setInitialNotes('');
+      setError(null);
+    }
+  }, [isOpen, defaultProjectId]);
 
   const projectOptions = [
     { label: '-- Select a Project --', value: '' },

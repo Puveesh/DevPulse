@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProjects } from '../../hooks/useProjects';
+import { useWorkSessionContext } from '../../contexts/WorkSessionContext';
 import { ProjectModal } from './ProjectModal';
 import { DeleteProjectDialog } from './DeleteProjectDialog';
 import { Button } from '../../components/ui/Button';
@@ -19,13 +20,30 @@ import {
   Terminal,
   Clock,
   Filter,
+  Play,
+  Pause,
+  Square,
 } from 'lucide-react';
-import { formatDate } from '../../lib/utils';
+import { formatDate, formatDuration } from '../../lib/utils';
 import type { Project, ProjectStatus } from '../../types';
 
 export function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const {
+    activeSession,
+    elapsedSeconds,
+    openStartModal,
+    openEndModal,
+    pauseSession,
+    resumeSession,
+    isPausing,
+    isResuming,
+    isSessionActiveForProject,
+    isSessionPausedForProject,
+    isAnotherProjectActive,
+  } = useWorkSessionContext();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | ''>('');
@@ -161,38 +179,175 @@ export function ProjectsPage() {
                 )}
               </div>
 
-              <div className="pt-4 mt-4 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-zinc-500" />
-                  <span>{formatDate(project.updatedAt)}</span>
-                </div>
+              {/* Bottom footer container with compact timer control */}
+              <div className="pt-4 mt-4 border-t border-zinc-800/80 space-y-3">
+                {/* Inline Compact Development Session Timer Control */}
+                {(() => {
+                  const isCurrentActive = isSessionActiveForProject(project.id);
+                  const isCurrentPaused = isSessionPausedForProject(project.id);
+                  const isAnotherActive = isAnotherProjectActive(project.id);
 
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  {project.repositoryUrl && (
-                    <a
-                      href={project.repositoryUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md transition-colors"
-                      title="Open repository"
+                  return (
+                    <div
+                      className="flex items-center justify-between text-xs"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
-                  <button
-                    onClick={(e) => handleEdit(project, e)}
-                    className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md transition-colors cursor-pointer"
-                    title="Edit project"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={(e) => handleDelete(project, e)}
-                    className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
-                    title="Delete project"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                      {isCurrentActive ? (
+                        // State B: Active session belongs to this project
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                            </span>
+                            <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
+                              Running
+                            </span>
+                            <span className="text-xs font-mono font-bold text-white">
+                              {formatDuration(elapsedSeconds)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (activeSession) pauseSession(activeSession.id);
+                              }}
+                              disabled={isPausing}
+                              title="Pause session"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
+                            >
+                              <Pause className="w-3 h-3 text-amber-400" />
+                              <span>Pause</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEndModal();
+                              }}
+                              title="End session"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-950/50 text-red-400 hover:bg-red-900/60 border border-red-800/40 transition-colors cursor-pointer"
+                            >
+                              <Square className="w-3 h-3 fill-current" />
+                              <span>Stop</span>
+                            </button>
+                          </div>
+                        </>
+                      ) : isCurrentPaused ? (
+                        // State C: Session is paused for this project
+                        <>
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-amber-400"></span>
+                            <span className="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">
+                              Paused
+                            </span>
+                            <span className="text-xs font-mono font-bold text-zinc-200">
+                              {formatDuration(elapsedSeconds)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (activeSession) resumeSession(activeSession.id);
+                              }}
+                              disabled={isResuming}
+                              title="Resume session"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-emerald-950/50 text-emerald-400 hover:bg-emerald-900/60 border border-emerald-800/40 transition-colors cursor-pointer"
+                            >
+                              <Play className="w-3 h-3 fill-current" />
+                              <span>Resume</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEndModal();
+                              }}
+                              title="End session"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-red-950/50 text-red-400 hover:bg-red-900/60 border border-red-800/40 transition-colors cursor-pointer"
+                            >
+                              <Square className="w-3 h-3 fill-current" />
+                              <span>Stop</span>
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        // State A: No active session for this project
+                        <>
+                          <span className="text-[11px] font-medium text-zinc-400 flex items-center gap-1.5">
+                            <Clock className="w-3 h-3 text-zinc-500" />
+                            <span>Dev Timer</span>
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isAnotherActive) {
+                                openStartModal(project.id);
+                              }
+                            }}
+                            disabled={isAnotherActive}
+                            title={
+                              isAnotherActive
+                                ? `A development session is active for "${activeSession?.projectName || 'another project'}"`
+                                : 'Start development session for this project'
+                            }
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                              isAnotherActive
+                                ? 'bg-zinc-800/40 text-zinc-500 border border-zinc-800/80 cursor-not-allowed opacity-60'
+                                : 'bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 border border-blue-500/30 hover:border-blue-500/50 cursor-pointer'
+                            }`}
+                          >
+                            <Play className={`w-3 h-3 ${isAnotherActive ? 'text-zinc-600' : 'fill-current'}`} />
+                            <span>Start</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Project Metadata & Actions */}
+                <div className="flex items-center justify-between text-xs text-zinc-500 pt-1 border-t border-zinc-800/40">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>{formatDate(project.updatedAt)}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    {project.repositoryUrl && (
+                      <a
+                        href={project.repositoryUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md transition-colors"
+                        title="Open repository"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    <button
+                      onClick={(e) => handleEdit(project, e)}
+                      className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-md transition-colors cursor-pointer"
+                      title="Edit project"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDelete(project, e)}
+                      className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition-colors cursor-pointer"
+                      title="Delete project"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

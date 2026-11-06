@@ -1,12 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useWorkSessionContext } from '../../contexts/WorkSessionContext';
 import { useProjects } from '../../hooks/useProjects';
-import {
-  useActiveSession,
-  useWorkSessions,
-  usePauseSession,
-  useResumeSession,
-} from '../../hooks/useWorkSessions';
+import { useWorkSessions } from '../../hooks/useWorkSessions';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -25,49 +21,27 @@ import {
   Terminal,
   Square,
 } from 'lucide-react';
-import { formatDate, formatDuration, formatTime, calculateWorkingSeconds } from '../../lib/utils';
-import { StartSessionModal } from '../worklog/StartSessionModal';
-import { EndSessionModal } from '../worklog/EndSessionModal';
+import { formatDate, formatDuration, formatTime } from '../../lib/utils';
 import { SessionDetailModal } from '../worklog/SessionDetailModal';
 import type { WorkSession } from '../../types';
 
 export function DashboardPage() {
   const { user } = useAuth();
   const { data: projects, isLoading } = useProjects();
-  const { data: activeSession } = useActiveSession();
+  const {
+    activeSession,
+    elapsedSeconds,
+    openStartModal,
+    openEndModal,
+    pauseSession,
+    resumeSession,
+    isPausing,
+    isResuming,
+  } = useWorkSessionContext();
   const { data: sessionsData } = useWorkSessions(0, 10);
-  const pauseSessionMutation = usePauseSession();
-  const resumeSessionMutation = useResumeSession();
   const navigate = useNavigate();
 
-  const [isStartModalOpen, setIsStartModalOpen] = useState(false);
-  const [isEndModalOpen, setIsEndModalOpen] = useState(false);
   const [selectedDetailSession, setSelectedDetailSession] = useState<WorkSession | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  // Live timer tick for active/paused session
-  useEffect(() => {
-    if (!activeSession) {
-      setElapsedSeconds(0);
-      return;
-    }
-
-    const updateTime = () => {
-      const calculated = calculateWorkingSeconds(
-        activeSession.startedAt,
-        activeSession.endedAt,
-        activeSession.pauseIntervals
-      );
-      setElapsedSeconds(calculated);
-    };
-
-    updateTime();
-
-    if (activeSession.status === 'ACTIVE') {
-      const interval = setInterval(updateTime, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [activeSession]);
 
   const activeProjects = projects?.filter((p) => p.status === 'ACTIVE') || [];
   const activeCount = activeProjects.length;
@@ -276,8 +250,8 @@ export function DashboardPage() {
                         variant="outline"
                         className="text-xs justify-center"
                         leftIcon={<Pause className="w-3.5 h-3.5 text-amber-400" />}
-                        isLoading={pauseSessionMutation.isPending}
-                        onClick={() => pauseSessionMutation.mutate(activeSession.id)}
+                        isLoading={isPausing}
+                        onClick={() => pauseSession(activeSession.id)}
                       >
                         Pause
                       </Button>
@@ -287,8 +261,8 @@ export function DashboardPage() {
                         variant="outline"
                         className="text-xs justify-center"
                         leftIcon={<Play className="w-3.5 h-3.5 text-emerald-400" />}
-                        isLoading={resumeSessionMutation.isPending}
-                        onClick={() => resumeSessionMutation.mutate(activeSession.id)}
+                        isLoading={isResuming}
+                        onClick={() => resumeSession(activeSession.id)}
                       >
                         Resume
                       </Button>
@@ -299,7 +273,7 @@ export function DashboardPage() {
                       variant="primary"
                       className="text-xs justify-center bg-red-600 hover:bg-red-500 border-none text-white"
                       leftIcon={<Square className="w-3 h-3 fill-current" />}
-                      onClick={() => setIsEndModalOpen(true)}
+                      onClick={openEndModal}
                     >
                       End Session
                     </Button>
@@ -310,7 +284,7 @@ export function DashboardPage() {
                   variant="outline"
                   className="w-full justify-start text-xs font-medium"
                   leftIcon={<Play className="w-4 h-4 text-emerald-400 mr-1" />}
-                  onClick={() => setIsStartModalOpen(true)}
+                  onClick={() => openStartModal()}
                 >
                   Start Dev Session (Timer)
                 </Button>
@@ -367,21 +341,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Modals */}
-      <StartSessionModal
-        isOpen={isStartModalOpen}
-        onClose={() => setIsStartModalOpen(false)}
-      />
-
-      {activeSession && (
-        <EndSessionModal
-          isOpen={isEndModalOpen}
-          onClose={() => setIsEndModalOpen(false)}
-          session={activeSession}
-          elapsedSeconds={elapsedSeconds}
-        />
-      )}
-
+      {/* Session Details Modal */}
       <SessionDetailModal
         isOpen={!!selectedDetailSession}
         onClose={() => setSelectedDetailSession(null)}
