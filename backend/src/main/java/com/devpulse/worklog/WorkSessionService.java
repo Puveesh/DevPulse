@@ -87,6 +87,18 @@ public class WorkSessionService {
         WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
 
+        if (session.getStatus() == WorkSessionStatus.COMPLETED) {
+            throw new BadRequestException("Completed work session cannot be paused");
+        }
+
+        // Idempotent: if already paused, return the confirmed paused state safely
+        if (session.getStatus() == WorkSessionStatus.PAUSED) {
+            String projectName = resolveProjectName(session.getProjectId(), userId);
+            List<SessionPauseInterval> intervals = pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(sessionId);
+            List<PauseIntervalDto> dtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+            return WorkSessionResponse.fromSession(session, projectName, session.getTotalDurationSeconds(), dtos);
+        }
+
         if (session.getStatus() != WorkSessionStatus.ACTIVE) {
             throw new BadRequestException("Only an active session can be paused. Current status: " + session.getStatus());
         }
@@ -112,6 +124,19 @@ public class WorkSessionService {
     public WorkSessionResponse resumeSession(UUID userId, UUID sessionId) {
         WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
+
+        if (session.getStatus() == WorkSessionStatus.COMPLETED) {
+            throw new BadRequestException("Completed work session cannot be resumed");
+        }
+
+        // Idempotent: if already active, return the confirmed active state safely
+        if (session.getStatus() == WorkSessionStatus.ACTIVE) {
+            String projectName = resolveProjectName(session.getProjectId(), userId);
+            List<SessionPauseInterval> intervals = pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(sessionId);
+            long workingSeconds = calculateWorkingDurationSeconds(session, intervals, Instant.now());
+            List<PauseIntervalDto> dtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+            return WorkSessionResponse.fromSession(session, projectName, workingSeconds, dtos);
+        }
 
         if (session.getStatus() != WorkSessionStatus.PAUSED) {
             throw new BadRequestException("Only a paused session can be resumed. Current status: " + session.getStatus());
@@ -139,8 +164,17 @@ public class WorkSessionService {
         WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
 
+        // Idempotent completion: if already completed, return existing completed session
         if (session.getStatus() == WorkSessionStatus.COMPLETED) {
-            throw new BadRequestException("Work session is already completed");
+            if (request != null && request.sessionNotes() != null && !request.sessionNotes().isBlank()
+                    && (session.getSessionNotes() == null || session.getSessionNotes().isBlank())) {
+                session.setSessionNotes(request.sessionNotes().trim());
+                workSessionRepository.save(session);
+            }
+            String projectName = resolveProjectName(session.getProjectId(), userId);
+            List<SessionPauseInterval> intervals = pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(sessionId);
+            List<PauseIntervalDto> dtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+            return WorkSessionResponse.fromSession(session, projectName, session.getTotalDurationSeconds(), dtos);
         }
 
         Instant now = Instant.now();

@@ -239,4 +239,114 @@ class WorkSessionIntegrationTest {
                         .header("Authorization", "Bearer " + tokenUser2))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void testIdempotentEndSessionReturnsCompletedStateInsteadOfError() throws Exception {
+        String token = registerAndGetToken("idempotent@devpulse.io", "Idempotent Tester");
+        UUID userId = userRepository.findByEmail("idempotent@devpulse.io").orElseThrow().getId();
+
+        Project project = projectRepository.save(new Project(
+                userId, "Idempotent Project", "Test idempotent calls", null, "Java", ProjectStatus.ACTIVE
+        ));
+
+        StartWorkSessionRequest startReq = new StartWorkSessionRequest(
+                project.getId(), null, "Test Idempotent End", null
+        );
+
+        MvcResult startResult = mockMvc.perform(post("/api/v1/work-sessions/start")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(startReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        ApiResponse<WorkSessionResponse> startResp = objectMapper.readValue(
+                startResult.getResponse().getContentAsString(),
+                new TypeReference<>() {}
+        );
+        UUID sessionId = startResp.data().id();
+
+        EndWorkSessionRequest endReq = new EndWorkSessionRequest(
+                "Wrap up notes 1", Instant.now().plusSeconds(30)
+        );
+
+        // 1. First End call -> 200 OK
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/end")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(endReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("COMPLETED")))
+                .andExpect(jsonPath("$.data.sessionNotes", is("Wrap up notes 1")));
+
+        // 2. Second End call (retry or double-click) -> must also return 200 OK (idempotent, NOT 400 error!)
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/end")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(endReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("COMPLETED")))
+                .andExpect(jsonPath("$.data.sessionNotes", is("Wrap up notes 1")));
+
+        // 3. Pause completed session -> 400 Bad Request
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/pause")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+
+        // 4. Resume completed session -> 400 Bad Request
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/resume")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testIdempotentPauseAndResume() throws Exception {
+        String token = registerAndGetToken("toggle@devpulse.io", "Toggle Tester");
+        UUID userId = userRepository.findByEmail("toggle@devpulse.io").orElseThrow().getId();
+
+        Project project = projectRepository.save(new Project(
+                userId, "Toggle Project", "Testing pause resume", null, "Java", ProjectStatus.ACTIVE
+        ));
+
+        StartWorkSessionRequest startReq = new StartWorkSessionRequest(
+                project.getId(), null, "Test Toggle Session", null
+        );
+
+        MvcResult startResult = mockMvc.perform(post("/api/v1/work-sessions/start")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(startReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        ApiResponse<WorkSessionResponse> startResp = objectMapper.readValue(
+                startResult.getResponse().getContentAsString(),
+                new TypeReference<>() {}
+        );
+        UUID sessionId = startResp.data().id();
+
+        // 1. Pause
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/pause")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("PAUSED")));
+
+        // 2. Pause again (double-click) -> 200 OK with PAUSED
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/pause")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("PAUSED")));
+
+        // 3. Resume
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/resume")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("ACTIVE")));
+
+        // 4. Resume again (double-click) -> 200 OK with ACTIVE
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/resume")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status", is("ACTIVE")));
+    }
 }

@@ -1,53 +1,28 @@
-import { useState, useEffect } from 'react';
-import {
-  useActiveSession,
-  useWorkSessions,
-  usePauseSession,
-  useResumeSession,
-} from '../../hooks/useWorkSessions';
+import { useState } from 'react';
+import { useWorkSessionContext } from '../../contexts/WorkSessionContext';
+import { useWorkSessions } from '../../hooks/useWorkSessions';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/common/EmptyState';
 import { Clock, Play, Pause, Square, FileText, Calendar, FolderKanban } from 'lucide-react';
-import { formatDate, formatTime, formatDuration, calculateWorkingSeconds } from '../../lib/utils';
-import { StartSessionModal } from './StartSessionModal';
-import { EndSessionModal } from './EndSessionModal';
+import { formatDate, formatTime, formatDuration } from '../../lib/utils';
 import { SessionDetailModal } from './SessionDetailModal';
 import type { WorkSession } from '../../types';
 
 export function WorkSessionsPage() {
-  const { data: activeSession } = useActiveSession();
+  const {
+    activeSession,
+    elapsedSeconds,
+    openStartModal,
+    openEndModal,
+    pauseSession,
+    resumeSession,
+    isPausing,
+    isResuming,
+  } = useWorkSessionContext();
   const { data: sessionsData, isLoading } = useWorkSessions(0, 50);
-  const pauseSessionMutation = usePauseSession();
-  const resumeSessionMutation = useResumeSession();
 
-  const [isStartModalOpen, setIsStartModalOpen] = useState(false);
-  const [isEndModalOpen, setIsEndModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<WorkSession | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    if (!activeSession) {
-      setElapsedSeconds(0);
-      return;
-    }
-
-    const updateTime = () => {
-      const calculated = calculateWorkingSeconds(
-        activeSession.startedAt,
-        activeSession.endedAt,
-        activeSession.pauseIntervals
-      );
-      setElapsedSeconds(calculated);
-    };
-
-    updateTime();
-
-    if (activeSession.status === 'ACTIVE') {
-      const interval = setInterval(updateTime, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [activeSession]);
 
   const allSessions = sessionsData?.content || [];
   const completedSessions = allSessions.filter((s) => s.status === 'COMPLETED');
@@ -67,7 +42,7 @@ export function WorkSessionsPage() {
               size="sm"
               variant="primary"
               leftIcon={<Play className="w-3.5 h-3.5 fill-current" />}
-              onClick={() => setIsStartModalOpen(true)}
+              onClick={() => openStartModal()}
             >
               Start Session
             </Button>
@@ -77,7 +52,7 @@ export function WorkSessionsPage() {
               variant="primary"
               className="bg-red-600 hover:bg-red-500 border-none text-white"
               leftIcon={<Square className="w-3.5 h-3.5 fill-current" />}
-              onClick={() => setIsEndModalOpen(true)}
+              onClick={openEndModal}
             >
               End Session ({formatDuration(elapsedSeconds)})
             </Button>
@@ -136,8 +111,9 @@ export function WorkSessionsPage() {
                     size="sm"
                     variant="outline"
                     leftIcon={<Pause className="w-3.5 h-3.5 text-amber-400" />}
-                    isLoading={pauseSessionMutation.isPending}
-                    onClick={() => pauseSessionMutation.mutate(activeSession.id)}
+                    isLoading={isPausing}
+                    disabled={isPausing}
+                    onClick={() => pauseSession(activeSession.id)}
                   >
                     Pause
                   </Button>
@@ -146,8 +122,9 @@ export function WorkSessionsPage() {
                     size="sm"
                     variant="outline"
                     leftIcon={<Play className="w-3.5 h-3.5 text-emerald-400" />}
-                    isLoading={resumeSessionMutation.isPending}
-                    onClick={() => resumeSessionMutation.mutate(activeSession.id)}
+                    isLoading={isResuming}
+                    disabled={isResuming}
+                    onClick={() => resumeSession(activeSession.id)}
                   >
                     Resume
                   </Button>
@@ -157,7 +134,7 @@ export function WorkSessionsPage() {
                   variant="primary"
                   className="bg-red-600 hover:bg-red-500 border-none text-white"
                   leftIcon={<Square className="w-3.5 h-3.5 fill-current" />}
-                  onClick={() => setIsEndModalOpen(true)}
+                  onClick={openEndModal}
                 >
                   End & Save
                 </Button>
@@ -235,27 +212,13 @@ export function WorkSessionsPage() {
               title="No Work Sessions Yet"
               description="Start a development session to track your time and progress automatically."
               actionText="Start First Session"
-              onAction={() => setIsStartModalOpen(true)}
+              onAction={() => openStartModal()}
             />
           )}
         </CardContent>
       </Card>
 
-      {/* Modals */}
-      <StartSessionModal
-        isOpen={isStartModalOpen}
-        onClose={() => setIsStartModalOpen(false)}
-      />
-
-      {activeSession && (
-        <EndSessionModal
-          isOpen={isEndModalOpen}
-          onClose={() => setIsEndModalOpen(false)}
-          session={activeSession}
-          elapsedSeconds={elapsedSeconds}
-        />
-      )}
-
+      {/* Session Detail Modal */}
       <SessionDetailModal
         isOpen={!!selectedSession}
         onClose={() => setSelectedSession(null)}

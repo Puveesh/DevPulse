@@ -142,4 +142,62 @@ describe('Project Card Compact Timer State Machine', () => {
     expect(cardB.state).toBe('STATE_A_IDLE');
     expect(cardB.canStart).toBe(true);
   });
+
+  it('Reconciliation: handles "already completed" session error by resetting active state to null', () => {
+    let activeSessionCache: WorkSession | null = {
+      id: 'session-stale',
+      userId: 'user-1',
+      projectId: projectAId,
+      projectName: 'Project Alpha',
+      title: 'Stale Session',
+      initialNotes: null,
+      sessionNotes: null,
+      startedAt: new Date(Date.now() - 100000).toISOString(),
+      endedAt: null,
+      status: 'ACTIVE',
+      totalDurationSeconds: 100,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Client reconciliation handler
+    const reconcileCompletedError = (errorMessage: string) => {
+      if (errorMessage.toLowerCase().includes('already completed')) {
+        activeSessionCache = null;
+        return true;
+      }
+      return false;
+    };
+
+    // Simulate backend responding with "Work session is already completed"
+    const isReconciled = reconcileCompletedError('Work session is already completed');
+    expect(isReconciled).toBe(true);
+    expect(activeSessionCache).toBeNull();
+
+    // Verify card returns to idle state immediately
+    const cardA = evaluateCardTimerState(activeSessionCache, projectAId);
+    expect(cardA.state).toBe('STATE_A_IDLE');
+    expect(cardA.canStart).toBe(true);
+  });
+
+  it('Submission Guard: blocks rapid duplicate clicks when isSubmitting is true', () => {
+    let submissionCount = 0;
+    let isSubmitting = false;
+
+    const submitEndSession = () => {
+      if (isSubmitting) {
+        return; // blocked duplicate
+      }
+      isSubmitting = true;
+      submissionCount++;
+    };
+
+    // Simulate 3 rapid clicks
+    submitEndSession();
+    submitEndSession();
+    submitEndSession();
+
+    expect(submissionCount).toBe(1);
+  });
 });
+

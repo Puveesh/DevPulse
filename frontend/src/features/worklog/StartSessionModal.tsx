@@ -24,6 +24,7 @@ export function StartSessionModal({ isOpen, onClose, defaultProjectId }: StartSe
   const [projectId, setProjectId] = useState<string>(defaultProjectId || '');
   const [title, setTitle] = useState('');
   const [initialNotes, setInitialNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,6 +33,7 @@ export function StartSessionModal({ isOpen, onClose, defaultProjectId }: StartSe
       setTitle('');
       setInitialNotes('');
       setError(null);
+      setIsSubmitting(false);
     }
   }, [isOpen, defaultProjectId]);
 
@@ -40,8 +42,11 @@ export function StartSessionModal({ isOpen, onClose, defaultProjectId }: StartSe
     ...projects.map((p) => ({ label: p.name, value: p.id })),
   ];
 
+  const isPending = isSubmitting || startSessionMutation.isPending;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
 
     if (!projectId) {
       setError('Please select a project for this development session');
@@ -53,6 +58,7 @@ export function StartSessionModal({ isOpen, onClose, defaultProjectId }: StartSe
       return;
     }
 
+    setIsSubmitting(true);
     try {
       setError(null);
       await startSessionMutation.mutateAsync({
@@ -70,6 +76,8 @@ export function StartSessionModal({ isOpen, onClose, defaultProjectId }: StartSe
       } else {
         setError('Failed to start session');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -135,13 +143,14 @@ export function StartSessionModal({ isOpen, onClose, defaultProjectId }: StartSe
           />
 
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800/80">
-            <Button type="button" variant="outline" onClick={onClose} disabled={startSessionMutation.isPending}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
               Cancel
             </Button>
             <Button
               type="submit"
               variant="primary"
-              isLoading={startSessionMutation.isPending}
+              isLoading={isPending}
+              disabled={isPending}
               leftIcon={<Play className="w-4 h-4 fill-current" />}
             >
               Start Timer

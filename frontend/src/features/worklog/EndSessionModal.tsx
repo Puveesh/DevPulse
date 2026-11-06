@@ -23,13 +23,19 @@ export function EndSessionModal({
 }: EndSessionModalProps) {
   const endSessionMutation = useEndSession();
   const [sessionNotes, setSessionNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const startTimeFormatted = formatTime(session.startedAt);
   const currentTimeFormatted = formatTime(new Date().toISOString());
 
+  const isPending = isSubmitting || endSessionMutation.isPending;
+
   const handleEnd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
+
+    setIsSubmitting(true);
     try {
       setError(null);
       await endSessionMutation.mutateAsync({
@@ -42,11 +48,16 @@ export function EndSessionModal({
       setSessionNotes('');
       onClose();
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
+      const msg = err instanceof Error ? err.message : 'Failed to end session';
+      if (msg.toLowerCase().includes('already completed')) {
+        // Reconcile and close
+        setSessionNotes('');
+        onClose();
       } else {
-        setError('Failed to end session');
+        setError(msg);
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -114,14 +125,15 @@ export function EndSessionModal({
             type="button"
             variant="outline"
             onClick={onClose}
-            disabled={endSessionMutation.isPending}
+            disabled={isPending}
           >
             Keep Session Running
           </Button>
           <Button
             type="submit"
             variant="primary"
-            isLoading={endSessionMutation.isPending}
+            isLoading={isPending}
+            disabled={isPending}
             leftIcon={<Square className="w-3.5 h-3.5 fill-current" />}
           >
             End & Save Session

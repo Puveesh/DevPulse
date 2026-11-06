@@ -38,6 +38,8 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (activeSession) {
       setSessionForEndModal(activeSession);
+    } else {
+      setSessionForEndModal(null);
     }
   }, [activeSession]);
 
@@ -61,7 +63,20 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
 
     if (activeSession.status === 'ACTIVE') {
       const interval = setInterval(updateTime, 1000);
-      return () => clearInterval(interval);
+
+      // Instant synchronization upon window focus or Electron restore
+      const handleWindowFocus = () => {
+        updateTime();
+      };
+
+      window.addEventListener('focus', handleWindowFocus);
+      document.addEventListener('visibilitychange', handleWindowFocus);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', handleWindowFocus);
+        document.removeEventListener('visibilitychange', handleWindowFocus);
+      };
     }
   }, [activeSession]);
 
@@ -160,6 +175,7 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
           isOpen={isEndModalOpen}
           onClose={() => {
             setIsEndModalOpen(false);
+            setSessionForEndModal(null);
           }}
           session={sessionForEndModal}
           elapsedSeconds={elapsedSeconds}
@@ -176,3 +192,4 @@ export function useWorkSessionContext() {
   }
   return context;
 }
+

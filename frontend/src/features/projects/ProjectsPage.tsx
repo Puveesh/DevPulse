@@ -213,14 +213,16 @@ export function ProjectsPage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (activeSession) pauseSession(activeSession.id);
+                                if (!isPausing && activeSession) pauseSession(activeSession.id);
                               }}
                               disabled={isPausing}
                               title="Pause session"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors cursor-pointer"
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-zinc-800 text-zinc-300 transition-colors ${
+                                isPausing ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-zinc-700 cursor-pointer'
+                              }`}
                             >
                               <Pause className="w-3 h-3 text-amber-400" />
-                              <span>Pause</span>
+                              <span>{isPausing ? 'Pausing...' : 'Pause'}</span>
                             </button>
                             <button
                               type="button"
@@ -254,14 +256,16 @@ export function ProjectsPage() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                if (activeSession) resumeSession(activeSession.id);
+                                if (!isResuming && activeSession) resumeSession(activeSession.id);
                               }}
                               disabled={isResuming}
                               title="Resume session"
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-emerald-950/50 text-emerald-400 hover:bg-emerald-900/60 border border-emerald-800/40 transition-colors cursor-pointer"
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-emerald-950/50 text-emerald-400 border border-emerald-800/40 transition-colors ${
+                                isResuming ? 'opacity-60 cursor-not-allowed' : 'hover:bg-emerald-900/60 cursor-pointer'
+                              }`}
                             >
                               <Play className="w-3 h-3 fill-current" />
-                              <span>Resume</span>
+                              <span>{isResuming ? 'Resuming...' : 'Resume'}</span>
                             </button>
                             <button
                               type="button"

@@ -14,8 +14,8 @@ export function Sidebar() {
   const navItems = [
     { name: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
     { name: 'Projects', to: '/projects', icon: FolderKanban },
-    { name: 'Work Sessions', to: '/worklogs', icon: Clock, badge: 'Soon' },
-    { name: 'Analytics', to: '/analytics', icon: BarChart3, badge: 'Soon' },
+    { name: 'Work Sessions', to: '/worklogs', icon: Clock },
+    { name: 'Analytics', to: '/analytics', icon: BarChart3 },
     { name: 'Settings', to: '/settings', icon: Settings },
   ];
 
@@ -54,11 +54,6 @@ export function Sidebar() {
                   <Icon className="w-4 h-4 shrink-0" />
                   <span>{item.name}</span>
                 </div>
-                {item.badge && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-sm bg-zinc-800 text-zinc-400 font-mono">
-                    {item.badge}
-                  </span>
-                )}
               </NavLink>
             );
           })}
