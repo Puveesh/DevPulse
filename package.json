@@ -1,0 +1,17 @@
+{
+  "name": "devpulse-monorepo",
+  "private": true,
+  "description": "DevPulse - Developer Worklog & Analytics Platform",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:web": "npm --prefix frontend run dev:web",
+    "dev:backend": "cd backend && mvn spring-boot:run",
+    "build": "npm --prefix frontend run build",
+    "build:web": "npm --prefix frontend run build:web",
+    "dist": "npm --prefix frontend run dist",
+    "dist:dir": "npm --prefix frontend run dist:dir",
+    "test": "npm --prefix frontend run test",
+    "test:backend": "cd backend && mvn test"
+  }
+}
+

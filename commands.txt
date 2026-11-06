@@ -1,0 +1,88 @@
+1. Database Commands (Prerequisite for Backend)
+
+DevPulse uses MySQL with automated Flyway schema migrations.
+
+bash
+# Start MySQL container in the background
+docker-compose up -d
+# Check database container status
+docker-compose ps
+# View database logs (useful to verify startup)
+docker-compose logs -f
+# Stop the database container
+docker-compose down
+2. Run the Spring Boot Backend
+
+The backend runs independently on port 8081.
+
+bash
+# From the root directory:
+npm run dev:backend
+# Or directly from the backend directory:
+cd backend
+mvn spring-boot:run
+Backend API Base: http://localhost:8081
+Swagger / OpenAPI Documentation: http://localhost:8081/swagger-ui.html
+API Docs JSON: http://localhost:8081/api-docs
+3. Run the DevPulse Desktop App (Development Mode)
+
+Starts the Vite server with Hot Module Replacement (HMR) and automatically opens the DevPulse desktop window. Any React or CSS file changes reflect immediately inside the desktop window without restarting.
+
+bash
+# From the root directory:
+npm run dev
+# Or from the frontend directory:
+cd frontend
+npm run dev
+4. Build the Windows .exe and Installer
+
+All output files are generated inside frontend/dist-electron/.
+
+bash
+# 1. Compile the production bundles (main process, preload, and React frontend)
+npm run build
+# 2. Package into the Windows NSIS setup installer (.exe)
+npm run dist
+Generated Artifacts:
+File	Path	Description
+Installer	frontend/dist-electron/DevPulse Setup 0.0.0.exe	Windows NSIS installer wizard (with desktop & start menu shortcuts)
+Unpacked Executable	frontend/dist-electron/win-unpacked/DevPulse.exe	Standalone portable executable ready to run directly
+Fast Build Without Setup Installer (Direct .exe folder only):
+bash
+npm run dist:dir
+5. Run the Original Web Frontend Independently (In Browser)
+
+To run the web application in Chrome/Edge without launching Electron:
+
+bash
+# From the root directory:
+npm run dev:web
+# Or from the frontend directory:
+cd frontend
+npm run dev:web
+Available at: http://localhost:5173
+6. Helpful Development & Testing Commands
+Run Frontend Tests (Vitest)
+bash
+npm test
+Run Backend Integration Tests (Maven / JUnit)
+bash
+npm run test:backend
+# Or: cd backend && mvn test
+Run Standalone Web Build (Check for TypeScript / React bundle issues)
+bash
+npm run build:web
+Lint Frontend Code
+bash
+npm --prefix frontend run lint
+7. Typical Local Workflow Summary
+
+Open two terminal tabs:
+
+Tab 1 — Database & Backend:
+bash
+docker-compose up -d
+npm run dev:backend
+Tab 2 — Desktop Application:
+bash
+npm run dev

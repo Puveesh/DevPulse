@@ -1,0 +1,47 @@
+server:
+  port: ${SERVER_PORT:8081}
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: devpulse-backend
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/devpulse?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# Security and JWT configurations
+app:
+  jwt:
+    # 256-bit+ secure base64 or plaintext secret key
+    secret: ${JWT_SECRET:dGVzdC1zZWNyZXQta2V5LWRldnB1bHNlLWF1dGgtMjU2LWJpdC1zZWN1cmUta2V5LWZvci10ZXN0aW5nLXB1cnBvc2VzLW9ubHk=}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000} # 24 hours
+    cookie-name: devpulse_token
+    cookie-secure: ${JWT_COOKIE_SECURE:false}
+    cookie-same-site: Lax
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}
+
+# OpenAPI & Swagger
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+
