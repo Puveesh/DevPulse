@@ -284,7 +284,7 @@ export const WeeklyStatisticsModal: React.FC<WeeklyStatisticsModalProps> = ({
       onClose={onClose}
       title="Weekly Development Activity"
       description="Detailed project-wise distribution and weekly productivity breakdown."
-      className="max-w-3xl sm:max-w-4xl"
+      className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-y-auto"
     >
       <div className="space-y-6">
         {/* Navigation & Period Controls */}

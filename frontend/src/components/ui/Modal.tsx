@@ -9,9 +9,10 @@ export interface ModalProps {
   description?: string;
   children: React.ReactNode;
   className?: string;
+  contentClassName?: string;
 }
 
-export function Modal({ isOpen, onClose, title, description, children, className }: ModalProps) {
+export function Modal({ isOpen, onClose, title, description, children, className, contentClassName }: ModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -33,7 +34,7 @@ export function Modal({ isOpen, onClose, title, description, children, className
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
       <div
         className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity animate-in fade-in"
         onClick={onClose}
@@ -47,7 +48,7 @@ export function Modal({ isOpen, onClose, title, description, children, className
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-start justify-between pb-4 border-b border-zinc-800/80">
+        <div className="flex items-start justify-between pb-4 border-b border-zinc-800/80 shrink-0">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-zinc-100">{title}</h2>
             {description && <p className="text-xs text-zinc-400 mt-1">{description}</p>}
@@ -60,7 +61,7 @@ export function Modal({ isOpen, onClose, title, description, children, className
             <span className="sr-only">Close</span>
           </button>
         </div>
-        <div className="pt-4">{children}</div>
+        <div className={cn("pt-4", contentClassName)}>{children}</div>
       </div>
     </div>
   );

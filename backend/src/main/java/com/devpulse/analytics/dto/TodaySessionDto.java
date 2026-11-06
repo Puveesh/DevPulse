@@ -18,3 +18,4 @@ public record TodaySessionDto(
         String initialNotes,
         String sessionNotes
 ) {}
+

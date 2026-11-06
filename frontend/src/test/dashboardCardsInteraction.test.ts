@@ -106,3 +106,4 @@ describe('Dashboard Cards Interaction & Today Worklogs Grouping Tests', () => {
     expect(formatDurationHoursMinutes(totalWithLive)).toBe('1h 02m');
   });
 });
+
