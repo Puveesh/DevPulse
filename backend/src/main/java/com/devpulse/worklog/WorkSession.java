@@ -59,11 +59,21 @@ public class WorkSession extends BaseEntity {
     public void completeSession(Instant endTime) {
         Instant actualEnd = endTime != null ? endTime : Instant.now();
         if (actualEnd.isBefore(this.startedAt)) {
-            throw new IllegalArgumentException("Session end time cannot precede start time");
+            actualEnd = this.startedAt;
         }
         this.endedAt = actualEnd;
         this.durationSeconds = Duration.between(this.startedAt, actualEnd).getSeconds();
         this.status = WorkSessionStatus.COMPLETED;
+    }
+
+    public void cancelSession() {
+        Instant actualEnd = Instant.now();
+        if (actualEnd.isBefore(this.startedAt)) {
+            actualEnd = this.startedAt;
+        }
+        this.endedAt = actualEnd;
+        this.durationSeconds = Duration.between(this.startedAt, actualEnd).getSeconds();
+        this.status = WorkSessionStatus.CANCELLED;
     }
 
     public UUID getUserId() {

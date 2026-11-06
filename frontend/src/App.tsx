@@ -8,6 +8,7 @@ import { RegisterPage } from './features/auth/RegisterPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
 import { ProjectDetailPage } from './features/projects/ProjectDetailPage';
+import { WorkSessionsPage } from './features/worklog/WorkSessionsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { EmptyState } from './components/common/EmptyState';
@@ -40,22 +41,7 @@ export function App() {
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/projects" element={<ProjectsPage />} />
                 <Route path="/projects/:id" element={<ProjectDetailPage />} />
-                <Route
-                  path="/worklogs"
-                  element={
-                    <div className="space-y-6">
-                      <div className="border-b border-zinc-800 pb-6">
-                        <h1 className="text-2xl font-bold tracking-tight text-white">Work Sessions</h1>
-                        <p className="text-xs text-zinc-400 mt-1">Live tracking and development logs.</p>
-                      </div>
-                      <EmptyState
-                        icon={<Clock className="w-8 h-8 text-blue-400" />}
-                        title="Work Sessions Module"
-                        description="The WorkSession database entity and constraints are active. The interactive stopwatch and live timer engine will launch in Phase 2."
-                      />
-                    </div>
-                  }
-                />
+                <Route path="/worklogs" element={<WorkSessionsPage />} />
                 <Route
                   path="/analytics"
                   element={

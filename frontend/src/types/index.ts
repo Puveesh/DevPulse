@@ -75,3 +75,34 @@ export interface PageResponse<T> {
   };
 }
 
+export type WorkSessionStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+
+export interface WorkSession {
+  id: string;
+  userId: string;
+  projectId: string | null;
+  projectName?: string | null;
+  taskId: string | null;
+  title: string;
+  notes: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  status: WorkSessionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StartWorkSessionPayload {
+  projectId?: string | null;
+  taskId?: string | null;
+  title: string;
+  notes?: string | null;
+}
+
+export interface EndWorkSessionPayload {
+  notes?: string | null;
+  endedAt?: string;
+}
+
+

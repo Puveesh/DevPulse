@@ -55,7 +55,7 @@ export function RegisterPage() {
             <Activity className="w-6 h-6 text-blue-500" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">DevPulse</h1>
-          <p className="text-xs text-zinc-400">DevPulse Desktop Client</p>
+          <p className="text-xs text-zinc-400">Developer Worklog &amp; Analytics Platform</p>
         </div>
 
         {/* Card */}
@@ -121,10 +121,6 @@ export function RegisterPage() {
               Sign in
             </Link>
           </div>
-        </div>
-
-        <div className="text-center text-[10px] text-zinc-600 font-mono">
-          DevPulse Desktop Client &bull; v0.1.0
         </div>
       </div>
     </div>

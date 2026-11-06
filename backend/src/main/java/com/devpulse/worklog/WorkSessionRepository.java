@@ -15,11 +15,19 @@ import java.util.UUID;
 @Repository
 public interface WorkSessionRepository extends JpaRepository<WorkSession, UUID> {
     Optional<WorkSession> findByIdAndUserId(UUID id, UUID userId);
+
     Optional<WorkSession> findFirstByUserIdAndStatusOrderByStartedAtDesc(UUID userId, WorkSessionStatus status);
+
     Page<WorkSession> findByUserId(UUID userId, Pageable pageable);
+
+    Page<WorkSession> findByUserIdOrderByStartedAtDesc(UUID userId, Pageable pageable);
+
+    List<WorkSession> findTop10ByUserIdOrderByStartedAtDesc(UUID userId);
+
     List<WorkSession> findByUserIdAndStartedAtBetween(UUID userId, Instant start, Instant end);
 
-    @Query("SELECT COALESCE(SUM(ws.durationSeconds), 0) FROM WorkSession ws WHERE ws.userId = :userId AND ws.startedAt >= :since")
+    Page<WorkSession> findByProjectIdAndUserIdOrderByStartedAtDesc(UUID projectId, UUID userId, Pageable pageable);
+
+    @Query("SELECT COALESCE(SUM(ws.durationSeconds), 0) FROM WorkSession ws WHERE ws.userId = :userId AND ws.status = 'COMPLETED' AND ws.startedAt >= :since")
     long getTotalDurationSecondsSince(@Param("userId") UUID userId, @Param("since") Instant since);
 }
-

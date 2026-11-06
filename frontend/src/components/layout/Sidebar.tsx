@@ -6,7 +6,7 @@ import {
   BarChart3,
   Settings,
   Activity,
-  Monitor,
+  Layers,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -29,7 +29,7 @@ export function Sidebar() {
           </div>
           <div>
             <span className="text-sm font-bold tracking-tight text-white">DevPulse</span>
-            <span className="text-[10px] block text-zinc-400">Desktop Client <span className="text-zinc-500 font-mono">v0.1.0</span></span>
+            <span className="text-[10px] block text-zinc-500 font-mono">v0.1.0-alpha</span>
           </div>
         </div>
 
@@ -65,19 +65,14 @@ export function Sidebar() {
         </nav>
       </div>
 
-      {/* System status / desktop runtime summary footer */}
+      {/* System status / workspace summary footer */}
       <div className="p-4 border-t border-zinc-900/90">
         <div className="rounded-lg bg-zinc-900/50 p-3 border border-zinc-800/60">
-          <div className="flex items-center justify-between text-xs font-medium text-zinc-300">
-            <div className="flex items-center gap-2">
-              <Monitor className="w-3.5 h-3.5 text-blue-400" />
-              <span>Desktop Client</span>
-            </div>
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Active
-            </span>
+          <div className="flex items-center gap-2 text-xs font-medium text-zinc-300">
+            <Layers className="w-3.5 h-3.5 text-blue-400" />
+            <span>Workspace</span>
           </div>
-          <p className="text-[11px] text-zinc-500 mt-1">Windows native runtime &bull; Secure desktop container</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Data isolated &amp; encrypted per authenticated developer.</p>
         </div>
       </div>
     </aside>

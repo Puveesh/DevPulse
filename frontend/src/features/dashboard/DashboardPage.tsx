@@ -1,5 +1,12 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useProjects } from '../../hooks/useProjects';
+import {
+  useActiveSession,
+  useRecentSessions,
+  useTodayDuration,
+  useCancelSession,
+} from '../../hooks/useWorkSessions';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -15,13 +22,44 @@ import {
   TrendingUp,
   Calendar,
   Terminal,
+  Square,
+  X,
 } from 'lucide-react';
-import { formatDate } from '../../lib/utils';
+import { formatDate, formatDuration } from '../../lib/utils';
+import { StartSessionModal } from '../worklog/StartSessionModal';
+import { EndSessionModal } from '../worklog/EndSessionModal';
 
 export function DashboardPage() {
   const { user } = useAuth();
   const { data: projects, isLoading } = useProjects();
+  const { data: activeSession } = useActiveSession();
+  const { data: recentSessions = [] } = useRecentSessions();
+  const { data: todayLoggedSeconds = 0 } = useTodayDuration();
+  const cancelSessionMutation = useCancelSession();
   const navigate = useNavigate();
+
+  const [isStartModalOpen, setIsStartModalOpen] = useState(false);
+  const [isEndModalOpen, setIsEndModalOpen] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  // Live timer tick for active session
+  useEffect(() => {
+    if (!activeSession?.startedAt) {
+      setElapsedSeconds(0);
+      return;
+    }
+
+    const updateElapsed = () => {
+      const start = new Date(activeSession.startedAt).getTime();
+      const now = Date.now();
+      const diff = Math.max(0, Math.floor((now - start) / 1000));
+      setElapsedSeconds(diff);
+    };
+
+    updateElapsed();
+    const interval = setInterval(updateElapsed, 1000);
+    return () => clearInterval(interval);
+  }, [activeSession?.startedAt]);
 
   const activeProjects = projects?.filter((p) => p.status === 'ACTIVE') || [];
   const activeCount = activeProjects.length;
@@ -75,12 +113,14 @@ export function DashboardPage() {
           </div>
         </Card>
 
-        {/* Today's Logged Time Placeholder */}
+        {/* Today's Logged Time */}
         <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-xs font-medium text-zinc-400">Today's Logged Time</span>
-              <div className="text-2xl font-bold tracking-tight text-zinc-100 font-mono">00:00:00</div>
+              <div className="text-2xl font-bold tracking-tight text-zinc-100 font-mono">
+                {formatDuration(todayLoggedSeconds + (activeSession ? elapsedSeconds : 0))}
+              </div>
             </div>
             <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
               <Clock className="w-5 h-5" />
@@ -88,7 +128,9 @@ export function DashboardPage() {
           </div>
           <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
             <span>Work timer engine</span>
-            <span className="text-[11px] font-mono text-zinc-400">Phase 2 integration</span>
+            <span className="text-[11px] font-mono text-zinc-400">
+              {activeSession ? 'Session in progress' : 'Logged today'}
+            </span>
           </div>
         </Card>
 
@@ -189,14 +231,63 @@ export function DashboardPage() {
               >
                 Create New Project
               </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-xs font-medium opacity-80"
-                leftIcon={<Play className="w-4 h-4 text-emerald-400 mr-1" />}
-                onClick={() => alert('Work session timer engine will be available in Phase 2.')}
-              >
-                Start Dev Session (Timer)
-              </Button>
+
+              {activeSession ? (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      Active Session
+                    </span>
+                    <span className="font-mono text-xs font-bold text-emerald-300">
+                      {formatDuration(elapsedSeconds)}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-medium text-zinc-100 truncate">{activeSession.title}</p>
+                    {activeSession.projectName && (
+                      <p className="text-[11px] text-zinc-400 truncate">Project: {activeSession.projectName}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="w-full text-xs justify-center bg-red-600 hover:bg-red-500 border-none text-white h-7"
+                      leftIcon={<Square className="w-3 h-3 fill-current" />}
+                      onClick={() => setIsEndModalOpen(true)}
+                    >
+                      End Session
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs text-zinc-400 hover:text-zinc-200 h-7 px-2"
+                      title="Cancel session"
+                      onClick={() => {
+                        if (window.confirm('Cancel this active session? Time will not be recorded.')) {
+                          cancelSessionMutation.mutate(activeSession.id);
+                        }
+                      }}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-xs font-medium"
+                  leftIcon={<Play className="w-4 h-4 text-emerald-400 mr-1" />}
+                  onClick={() => setIsStartModalOpen(true)}
+                >
+                  Start Dev Session (Timer)
+                </Button>
+              )}
+
               <Button
                 variant="outline"
                 className="w-full justify-start text-xs font-medium opacity-80"
@@ -208,22 +299,59 @@ export function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Work Sessions Placeholder */}
+          {/* Recent Work Sessions */}
           <Card>
             <CardHeader>
               <CardTitle>Recent Work Sessions</CardTitle>
               <CardDescription>Dev tracking history</CardDescription>
             </CardHeader>
             <CardContent>
-              <EmptyState
-                icon={<Clock className="w-5 h-5" />}
-                title="No work sessions recorded"
-                description="Session tracking data model is pre-configured and ready for tracking."
-              />
+              {recentSessions.length > 0 ? (
+                <div className="space-y-2.5">
+                  {recentSessions.slice(0, 4).map((session) => (
+                    <div
+                      key={session.id}
+                      className="rounded-lg border border-zinc-800/80 bg-zinc-900/50 p-3 space-y-1"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-zinc-200 truncate">{session.title}</span>
+                        <span className="text-[11px] font-mono text-zinc-400 shrink-0">
+                          {formatDuration(session.durationSeconds || 0)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                        <span className="truncate">{session.projectName || 'General'}</span>
+                        <span>{formatDate(session.startedAt)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  icon={<Clock className="w-5 h-5" />}
+                  title="No work sessions recorded"
+                  description="Session tracking data model is pre-configured and ready for tracking."
+                />
+              )}
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Modals */}
+      <StartSessionModal
+        isOpen={isStartModalOpen}
+        onClose={() => setIsStartModalOpen(false)}
+      />
+
+      {activeSession && (
+        <EndSessionModal
+          isOpen={isEndModalOpen}
+          onClose={() => setIsEndModalOpen(false)}
+          session={activeSession}
+          elapsedSeconds={elapsedSeconds}
+        />
+      )}
     </div>
   );
 }

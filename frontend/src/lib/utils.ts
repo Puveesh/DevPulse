@@ -34,3 +34,14 @@ export function formatTimeAgo(dateString: string): string {
   }
 }
 
+export function formatDuration(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds < 0) totalSeconds = 0;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
+
+
