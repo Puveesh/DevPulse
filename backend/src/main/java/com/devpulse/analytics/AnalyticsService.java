@@ -3,6 +3,7 @@ package com.devpulse.analytics;
 import com.devpulse.analytics.dto.DailyActivityDto;
 import com.devpulse.analytics.dto.ProjectDurationDto;
 import com.devpulse.analytics.dto.TodayAnalyticsResponse;
+import com.devpulse.analytics.dto.TodaySessionDto;
 import com.devpulse.analytics.dto.WeeklyAnalyticsResponse;
 import com.devpulse.project.Project;
 import com.devpulse.project.ProjectRepository;
@@ -74,6 +75,7 @@ public class AnalyticsService {
         int sessionCount = 0;
         Set<UUID> distinctProjectIds = new HashSet<>();
         Map<UUID, Long> projectDurations = new HashMap<>();
+        List<TodaySessionDto> todaySessions = new ArrayList<>();
 
         UUID activeSessionId = null;
         long activeSessionTodayWorkingSeconds = 0L;
@@ -96,6 +98,20 @@ public class AnalyticsService {
                     distinctProjectIds.add(session.getProjectId());
                     projectDurations.merge(session.getProjectId(), workingInToday, Long::sum);
                 }
+
+                todaySessions.add(new TodaySessionDto(
+                        session.getId(),
+                        session.getProjectId(),
+                        null,
+                        session.getTitle(),
+                        session.getStatus(),
+                        session.getStartedAt(),
+                        session.getEndedAt(),
+                        workingInToday,
+                        session.getTotalDurationSeconds(),
+                        session.getInitialNotes(),
+                        session.getSessionNotes()
+                ));
             }
 
             if (session.getStatus() == WorkSessionStatus.ACTIVE && session.getEndedAt() == null) {
@@ -115,6 +131,24 @@ public class AnalyticsService {
                 .sorted(Comparator.comparingLong(ProjectDurationDto::durationSeconds).reversed())
                 .toList();
 
+        // 5. Populate project names in sessions list, sorted with newest first
+        List<TodaySessionDto> populatedSessions = todaySessions.stream()
+                .map(s -> new TodaySessionDto(
+                        s.id(),
+                        s.projectId(),
+                        projectNames.getOrDefault(s.projectId(), "General Development"),
+                        s.title(),
+                        s.status(),
+                        s.startedAt(),
+                        s.endedAt(),
+                        s.todayWorkingSeconds(),
+                        s.totalDurationSeconds(),
+                        s.initialNotes(),
+                        s.sessionNotes()
+                ))
+                .sorted(Comparator.comparing(TodaySessionDto::startedAt).reversed())
+                .toList();
+
         return new TodayAnalyticsResponse(
                 todayDate.toString(),
                 totalWorkingSeconds,
@@ -122,7 +156,8 @@ public class AnalyticsService {
                 distinctProjectIds.size(),
                 activeSessionId,
                 activeSessionTodayWorkingSeconds,
-                projectList
+                projectList,
+                populatedSessions
         );
     }
 

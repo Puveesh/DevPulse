@@ -10,6 +10,6 @@ public record TodayAnalyticsResponse(
         int projectCount,
         UUID activeSessionId,
         long activeSessionTodayWorkingSeconds,
-        List<ProjectDurationDto> projects
+        List<ProjectDurationDto> projects,
+        List<TodaySessionDto> sessions
 ) {}
-

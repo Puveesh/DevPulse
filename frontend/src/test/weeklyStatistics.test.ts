@@ -61,3 +61,4 @@ describe('Weekly Statistics Modal & Navigation Tests', () => {
     expect(clamped).toBe(currentMonday);
   });
 });
+

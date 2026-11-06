@@ -176,7 +176,11 @@ class AnalyticsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalDurationSeconds", is(3600)))
                 .andExpect(jsonPath("$.data.sessionCount", is(1)))
-                .andExpect(jsonPath("$.data.projects[0].durationSeconds", is(3600)));
+                .andExpect(jsonPath("$.data.projects[0].durationSeconds", is(3600)))
+                .andExpect(jsonPath("$.data.sessions", hasSize(1)))
+                .andExpect(jsonPath("$.data.sessions[0].title", is("Midnight Crosser")))
+                .andExpect(jsonPath("$.data.sessions[0].todayWorkingSeconds", is(3600)))
+                .andExpect(jsonPath("$.data.sessions[0].projectName", is("Midnight Project")));
     }
 
     @Test

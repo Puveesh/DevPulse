@@ -249,7 +249,9 @@ export const WeeklyStatisticsModal: React.FC<WeeklyStatisticsModalProps> = ({
                         <span className="truncate max-w-[140px]">{projName}</span>
                       </span>
                       <span className="font-mono text-zinc-200 font-semibold shrink-0">
-                        {formatDurationHoursMinutes(duration)}
+                        {duration > 0 && duration < 60
+                          ? `${duration}s`
+                          : formatDurationHoursMinutes(duration)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-zinc-400 pl-4">
@@ -450,6 +452,9 @@ export const WeeklyStatisticsModal: React.FC<WeeklyStatisticsModalProps> = ({
                       name={proj.name}
                       stackId="weekly-projects"
                       fill={proj.color}
+                      stroke="#09090b"
+                      strokeWidth={1}
+                      minPointSize={8}
                       radius={
                         idx === activeProjectsInWeek.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]
                       }
@@ -509,3 +514,4 @@ export const WeeklyStatisticsModal: React.FC<WeeklyStatisticsModalProps> = ({
     </Modal>
   );
 };
+

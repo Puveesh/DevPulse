@@ -130,6 +130,20 @@ export interface DailyActivity {
   projects?: ProjectDuration[];
 }
 
+export interface TodaySession {
+  id: string;
+  projectId: string;
+  projectName: string;
+  title: string;
+  status: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
+  startedAt: string;
+  endedAt?: string | null;
+  todayWorkingSeconds: number;
+  totalDurationSeconds?: number | null;
+  initialNotes?: string | null;
+  sessionNotes?: string | null;
+}
+
 export interface TodayAnalytics {
   date: string;
   totalDurationSeconds: number;
@@ -138,6 +152,7 @@ export interface TodayAnalytics {
   activeSessionId: string | null;
   activeSessionTodayWorkingSeconds: number;
   projects: ProjectDuration[];
+  sessions?: TodaySession[];
 }
 
 export interface WeeklyAnalytics {

@@ -26,6 +26,7 @@ import { formatDate, formatDuration, formatTime, formatDurationHoursMinutes } fr
 import { SessionDetailModal } from '../worklog/SessionDetailModal';
 import { WeeklyActivityChart } from './WeeklyActivityChart';
 import { WeeklyStatisticsModal } from './WeeklyStatisticsModal';
+import { TodayWorklogModal } from './TodayWorklogModal';
 import type { WorkSession } from '../../types';
 
 export function DashboardPage() {
@@ -48,6 +49,7 @@ export function DashboardPage() {
 
   const [selectedDetailSession, setSelectedDetailSession] = useState<WorkSession | null>(null);
   const [isWeeklyStatsModalOpen, setIsWeeklyStatsModalOpen] = useState(false);
+  const [isTodayWorklogModalOpen, setIsTodayWorklogModalOpen] = useState(false);
 
   const activeProjects = projects?.filter((p) => p.status === 'ACTIVE') || [];
   const activeCount = activeProjects.length;
@@ -154,17 +156,22 @@ export function DashboardPage() {
       {/* Metrics / Key Indicators */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Active Projects Count */}
-        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between">
+        <Card
+          onClick={() => navigate('/projects')}
+          className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between cursor-pointer hover:border-zinc-700/80 hover:bg-zinc-850/50 transition-all group"
+        >
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <span className="text-xs font-medium text-zinc-400">Active Projects</span>
+              <span className="text-xs font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                Active Projects
+              </span>
               {isLoading ? (
                 <Skeleton className="h-8 w-16 mt-1" />
               ) : (
                 <div className="text-2xl font-bold tracking-tight text-zinc-100">{activeCount}</div>
               )}
             </div>
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 group-hover:border-blue-500/40 transition-colors">
               <FolderKanban className="w-5 h-5" />
             </div>
           </div>
@@ -175,11 +182,16 @@ export function DashboardPage() {
         </Card>
 
         {/* Today's Logged Time */}
-        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between">
+        <Card
+          onClick={() => setIsTodayWorklogModalOpen(true)}
+          className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between cursor-pointer hover:border-zinc-700/80 hover:bg-zinc-850/50 transition-all group"
+        >
           <div>
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs font-medium text-zinc-400">Today's Logged Time</span>
+                <span className="text-xs font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                  Today's Logged Time
+                </span>
                 {isTodayLoading ? (
                   <Skeleton className="h-8 w-28 mt-1" />
                 ) : (
@@ -188,7 +200,7 @@ export function DashboardPage() {
                   </div>
                 )}
               </div>
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 group-hover:border-amber-500/40 transition-colors">
                 <Clock className="w-5 h-5" />
               </div>
             </div>
@@ -499,6 +511,15 @@ export function DashboardPage() {
         isOpen={!!selectedDetailSession}
         onClose={() => setSelectedDetailSession(null)}
         session={selectedDetailSession}
+      />
+
+      {/* Expanded Today Worklogs Modal */}
+      <TodayWorklogModal
+        isOpen={isTodayWorklogModalOpen}
+        onClose={() => setIsTodayWorklogModalOpen(false)}
+        onSelectSessionForDetails={(session) => {
+          setSelectedDetailSession(session);
+        }}
       />
 
       {/* Expanded Weekly Statistics Modal */}
