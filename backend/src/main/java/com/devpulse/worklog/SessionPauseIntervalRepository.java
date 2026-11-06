@@ -10,6 +10,7 @@ import java.util.UUID;
 @Repository
 public interface SessionPauseIntervalRepository extends JpaRepository<SessionPauseInterval, UUID> {
     List<SessionPauseInterval> findBySessionIdOrderByPausedAtAsc(UUID sessionId);
+    List<SessionPauseInterval> findBySessionIdInOrderByPausedAtAsc(java.util.Collection<UUID> sessionIds);
     Optional<SessionPauseInterval> findFirstBySessionIdAndResumedAtIsNullOrderByPausedAtDesc(UUID sessionId);
 }
 

@@ -53,6 +53,28 @@ export function formatDurationHM(totalSeconds: number): string {
   return `${pad(hours)}:${pad(minutes)}`;
 }
 
+export function formatDurationHoursMinutes(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds < 0) return '0h 00m';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${hours}h ${pad(minutes)}m`;
+}
+
+export function formatDurationWords(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds < 0) return '0 mins';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  if (hours > 0 && minutes > 0) {
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'} ${minutes} ${minutes === 1 ? 'min' : 'mins'}`;
+  }
+  if (hours > 0) {
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+  }
+  return `${minutes} ${minutes === 1 ? 'min' : 'mins'}`;
+}
+
+
 export function formatTime(dateString: string): string {
   try {
     const date = new Date(dateString);

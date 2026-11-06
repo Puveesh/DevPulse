@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkSessionContext } from '../../contexts/WorkSessionContext';
 import { useProjects } from '../../hooks/useProjects';
 import { useWorkSessions } from '../../hooks/useWorkSessions';
+import { useTodayAnalytics, useWeeklyAnalytics } from '../../hooks/useAnalytics';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -21,8 +22,9 @@ import {
   Terminal,
   Square,
 } from 'lucide-react';
-import { formatDate, formatDuration, formatTime } from '../../lib/utils';
+import { formatDate, formatDuration, formatTime, formatDurationHoursMinutes } from '../../lib/utils';
 import { SessionDetailModal } from '../worklog/SessionDetailModal';
+import { WeeklyActivityChart } from './WeeklyActivityChart';
 import type { WorkSession } from '../../types';
 
 export function DashboardPage() {
@@ -39,6 +41,8 @@ export function DashboardPage() {
     isResuming,
   } = useWorkSessionContext();
   const { data: sessionsData } = useWorkSessions(0, 10);
+  const { data: todayData, isLoading: isTodayLoading } = useTodayAnalytics();
+  const { data: weeklyData, isLoading: isWeeklyLoading } = useWeeklyAnalytics();
   const navigate = useNavigate();
 
   const [selectedDetailSession, setSelectedDetailSession] = useState<WorkSession | null>(null);
@@ -46,6 +50,78 @@ export function DashboardPage() {
   const activeProjects = projects?.filter((p) => p.status === 'ACTIVE') || [];
   const activeCount = activeProjects.length;
   const completedSessions = (sessionsData?.content || []).filter((s) => s.status === 'COMPLETED');
+
+  // Real-time continuous ticking for active session without constant polling
+  const liveActiveExtra =
+    activeSession && activeSession.status === 'ACTIVE'
+      ? Math.max(0, elapsedSeconds - (todayData?.activeSessionTodayWorkingSeconds || 0))
+      : 0;
+
+  const liveTodaySeconds = (todayData?.totalDurationSeconds || 0) + liveActiveExtra;
+
+  // Real-time project breakdown
+  const projectBreakdown = useMemo(() => {
+    if (!todayData?.projects || todayData.projects.length === 0) {
+      if (activeSession && liveTodaySeconds > 0) {
+        return [
+          {
+            projectId: activeSession.projectId || null,
+            projectName: activeSession.projectName || 'General Development',
+            durationSeconds: liveTodaySeconds,
+          },
+        ];
+      }
+      return [];
+    }
+    const list = todayData.projects.map((p) => ({ ...p }));
+    if (activeSession && activeSession.status === 'ACTIVE' && liveActiveExtra > 0) {
+      const activeProjName = activeSession.projectName || 'General Development';
+      const existing = list.find(
+        (p) =>
+          (activeSession.projectId && p.projectId === activeSession.projectId) ||
+          p.projectName === activeProjName
+      );
+      if (existing) {
+        existing.durationSeconds += liveActiveExtra;
+      } else {
+        list.push({
+          projectId: activeSession.projectId || null,
+          projectName: activeProjName,
+          durationSeconds: liveActiveExtra,
+        });
+      }
+    }
+    return list.sort((a, b) => b.durationSeconds - a.durationSeconds);
+  }, [todayData?.projects, activeSession, liveActiveExtra, liveTodaySeconds]);
+
+  // Live weekly total & daily distribution
+  const liveWeeklyExtra =
+    activeSession && activeSession.status === 'ACTIVE'
+      ? Math.max(0, elapsedSeconds - (weeklyData?.activeSessionWeeklyWorkingSeconds || 0))
+      : 0;
+
+  const liveWeeklySeconds = (weeklyData?.totalDurationSeconds || 0) + liveWeeklyExtra;
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const weeklyDailyActivity = useMemo(() => {
+    if (!weeklyData?.dailyActivity) return [];
+    return weeklyData.dailyActivity.map((d) => {
+      if (d.date === todayStr && liveWeeklyExtra > 0) {
+        return {
+          ...d,
+          durationSeconds: d.durationSeconds + liveWeeklyExtra,
+        };
+      }
+      return d;
+    });
+  }, [weeklyData?.dailyActivity, todayStr, liveWeeklyExtra]);
 
   const currentHour = new Date().getHours();
   const greeting =
@@ -76,7 +152,7 @@ export function DashboardPage() {
       {/* Metrics / Key Indicators */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {/* Active Projects Count */}
-        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40">
+        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <span className="text-xs font-medium text-zinc-400">Active Projects</span>
@@ -96,37 +172,107 @@ export function DashboardPage() {
           </div>
         </Card>
 
-        {/* Today's Logged Time Placeholder */}
-        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-zinc-400">Today's Logged Time</span>
-              <div className="text-2xl font-bold tracking-tight text-zinc-100 font-mono">00:00:00</div>
+        {/* Today's Logged Time */}
+        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-zinc-400">Today's Logged Time</span>
+                {isTodayLoading ? (
+                  <Skeleton className="h-8 w-28 mt-1" />
+                ) : (
+                  <div className="text-2xl font-bold tracking-tight text-zinc-100 font-mono">
+                    {formatDuration(liveTodaySeconds)}
+                  </div>
+                )}
+              </div>
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                <Clock className="w-5 h-5" />
+              </div>
             </div>
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
-              <Clock className="w-5 h-5" />
-            </div>
+
+            {liveTodaySeconds > 0 && projectBreakdown.length > 0 && (
+              <div className="mt-3 space-y-1">
+                {projectBreakdown.slice(0, 2).map((p) => (
+                  <div key={p.projectName} className="flex items-center justify-between text-[11px]">
+                    <span className="truncate max-w-[140px] text-zinc-300 font-medium">
+                      {p.projectName}
+                    </span>
+                    <span className="font-mono text-zinc-400">
+                      {formatDurationHoursMinutes(p.durationSeconds)}
+                    </span>
+                  </div>
+                ))}
+                {projectBreakdown.length > 2 && (
+                  <div className="text-[10px] text-zinc-500 text-right">
+                    +{projectBreakdown.length - 2} more
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
           <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-            <span>Work timer engine</span>
-            <span className="text-[11px] font-mono text-zinc-400">Phase 2 integration</span>
+            {liveTodaySeconds === 0 ? (
+              <>
+                <span>Today's summary</span>
+                <span className="text-[11px] text-zinc-400 italic">No development time logged today.</span>
+              </>
+            ) : (
+              <>
+                <span>
+                  {todayData?.sessionCount || (activeSession ? 1 : 0)}{' '}
+                  {(todayData?.sessionCount || (activeSession ? 1 : 0)) === 1 ? 'session' : 'sessions'}
+                </span>
+                <span className="font-mono text-zinc-300">
+                  {projectBreakdown.length} {projectBreakdown.length === 1 ? 'project' : 'projects'}
+                </span>
+              </>
+            )}
           </div>
         </Card>
 
-        {/* Weekly Productivity Placeholder */}
-        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-zinc-400">Weekly Dev Activity</span>
-              <div className="text-2xl font-bold tracking-tight text-zinc-100 font-mono">--</div>
+        {/* Weekly Dev Activity */}
+        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <span className="text-xs font-medium text-zinc-400">Weekly Dev Activity</span>
+                {isWeeklyLoading ? (
+                  <Skeleton className="h-8 w-24 mt-1" />
+                ) : (
+                  <div className="text-2xl font-bold tracking-tight text-zinc-100 font-mono">
+                    {formatDurationHoursMinutes(liveWeeklySeconds)}
+                  </div>
+                )}
+              </div>
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <TrendingUp className="w-5 h-5" />
+              </div>
             </div>
-            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <TrendingUp className="w-5 h-5" />
+
+            <div className="mt-2.5 h-[64px] w-full">
+              {isWeeklyLoading ? (
+                <Skeleton className="h-[64px] w-full" />
+              ) : (
+                <WeeklyActivityChart
+                  dailyActivity={weeklyDailyActivity}
+                  todayDate={todayStr}
+                />
+              )}
             </div>
           </div>
+
           <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs text-zinc-500">
-            <span>Derived metrics</span>
-            <span className="text-[11px] text-zinc-400">No mock stats</span>
+            <span>
+              Most active:{' '}
+              <span className="text-zinc-300 font-medium font-sans">
+                {weeklyData?.mostActiveDay || (liveWeeklySeconds > 0 ? 'Today' : '--')}
+              </span>
+            </span>
+            <span className="font-mono text-zinc-300">
+              {weeklyData?.activeDays || (liveWeeklySeconds > 0 ? 1 : 0)}/7 days
+            </span>
           </div>
         </Card>
       </div>

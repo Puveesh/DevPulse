@@ -117,4 +117,37 @@ export interface UpdateSessionNotesPayload {
   sessionNotes: string;
 }
 
+export interface ProjectDuration {
+  projectId: string | null;
+  projectName: string;
+  durationSeconds: number;
+}
+
+export interface DailyActivity {
+  date: string;
+  day: string;
+  durationSeconds: number;
+}
+
+export interface TodayAnalytics {
+  date: string;
+  totalDurationSeconds: number;
+  sessionCount: number;
+  projectCount: number;
+  activeSessionId: string | null;
+  activeSessionTodayWorkingSeconds: number;
+  projects: ProjectDuration[];
+}
+
+export interface WeeklyAnalytics {
+  weekStart: string;
+  weekEnd: string;
+  totalDurationSeconds: number;
+  activeDays: number;
+  mostActiveDay: string | null;
+  activeSessionId: string | null;
+  activeSessionWeeklyWorkingSeconds: number;
+  dailyActivity: DailyActivity[];
+}
+
 

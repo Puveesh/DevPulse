@@ -82,6 +82,7 @@ export function useStartSession() {
         queryClient.setQueryData(['work-sessions', 'active'], data);
       }
       queryClient.invalidateQueries({ queryKey: ['work-sessions', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
   });
 }
@@ -104,6 +105,7 @@ export function usePauseSession() {
         queryClient.setQueryData(['work-sessions', 'active'], data);
       }
       queryClient.invalidateQueries({ queryKey: ['work-sessions', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
     onError: () => {
       // Reconcile with actual backend state on failure
@@ -130,6 +132,7 @@ export function useResumeSession() {
         queryClient.setQueryData(['work-sessions', 'active'], data);
       }
       queryClient.invalidateQueries({ queryKey: ['work-sessions', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
     onError: () => {
       // Reconcile with actual backend state on failure
@@ -152,6 +155,7 @@ export function useEndSession() {
         if (message.toLowerCase().includes('already completed')) {
           queryClient.setQueryData(['work-sessions', 'active'], null);
           queryClient.invalidateQueries({ queryKey: ['work-sessions'] });
+          queryClient.invalidateQueries({ queryKey: ['analytics'] });
           return null as unknown as WorkSession;
         }
         throw new Error(message);
@@ -161,6 +165,7 @@ export function useEndSession() {
       // Immediately clear active session so timer and card indicators disappear without delay
       queryClient.setQueryData(['work-sessions', 'active'], null);
       queryClient.invalidateQueries({ queryKey: ['work-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
     onError: () => {
       // Reconcile active session on error
