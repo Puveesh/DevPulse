@@ -14,3 +14,4 @@ public record PauseIntervalDto(
         return new PauseIntervalDto(interval.getId(), interval.getPausedAt(), interval.getResumedAt());
     }
 }
+

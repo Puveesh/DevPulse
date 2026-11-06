@@ -12,3 +12,4 @@ public interface SessionPauseIntervalRepository extends JpaRepository<SessionPau
     List<SessionPauseInterval> findBySessionIdOrderByPausedAtAsc(UUID sessionId);
     Optional<SessionPauseInterval> findFirstBySessionIdAndResumedAtIsNullOrderByPausedAtDesc(UUID sessionId);
 }
+

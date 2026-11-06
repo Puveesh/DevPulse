@@ -87,3 +87,4 @@ public class SessionPauseInterval {
         this.createdAt = createdAt;
     }
 }
+
