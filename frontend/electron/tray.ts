@@ -27,11 +27,11 @@ export function setupSystemTray(mainWindow: BrowserWindow): Tray | null {
     }
 
     tray = new Tray(trayIcon)
-    tray.setToolTip('DevPulse - Developer Worklog & Analytics Platform')
+    tray.setToolTip('DevPulse Desktop Client - Developer Worklog & Analytics Platform')
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: 'Open DevPulse',
+        label: 'Open DevPulse Desktop Client',
         click: () => {
           if (mainWindow.isMinimized()) mainWindow.restore()
           mainWindow.show()
@@ -40,7 +40,7 @@ export function setupSystemTray(mainWindow: BrowserWindow): Tray | null {
       },
       { type: 'separator' },
       {
-        label: 'Quit DevPulse',
+        label: 'Quit DevPulse Desktop Client',
         click: () => {
           app.quit()
         },

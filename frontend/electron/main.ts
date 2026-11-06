@@ -73,7 +73,7 @@ function createWindow(): void {
   const iconPath = resolveIconPath()
 
   mainWindow = new BrowserWindow({
-    title: 'DevPulse',
+    title: 'DevPulse Desktop Client',
     width: 1280,
     height: 800,
     minWidth: 960,

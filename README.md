@@ -196,8 +196,8 @@ npm run dist
 ```
 
 ### Generated Artifacts:
-- **Installer:** `frontend/dist-electron/DevPulse Setup 0.0.0.exe` (full installation wizard with shortcuts).
-- **Standalone:** `frontend/dist-electron/win-unpacked/DevPulse.exe` (unpacked directory executable).
+- **Installer:** `frontend/dist-electron/DevPulse Desktop Client Setup 0.1.0.exe` (full installation wizard with shortcuts).
+- **Standalone:** `frontend/dist-electron/win-unpacked/DevPulse Desktop Client.exe` (unpacked directory executable).
 
 To generate only the unpacked directory without creating the installer package:
 ```bash

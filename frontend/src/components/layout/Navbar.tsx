@@ -18,8 +18,11 @@ export function Navbar() {
 
   return (
     <header className="h-14 border-b border-zinc-800/80 bg-zinc-950/40 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
-      <div className="flex items-center gap-3">
-        <span className="text-xs font-medium text-zinc-400">Developer Workspace</span>
+      <div className="flex items-center gap-2.5">
+        <span className="text-xs font-medium text-zinc-300">DevPulse Desktop Client</span>
+        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+          Desktop Runtime
+        </span>
       </div>
 
       <div className="flex items-center gap-4">

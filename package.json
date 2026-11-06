@@ -1,7 +1,7 @@
 {
   "name": "devpulse-monorepo",
   "private": true,
-  "description": "DevPulse - Developer Worklog & Analytics Platform",
+  "description": "DevPulse Desktop Client - Developer Worklog & Analytics Platform",
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "dev:web": "npm --prefix frontend run dev:web",

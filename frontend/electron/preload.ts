@@ -2,7 +2,15 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 // Define the exposed desktop API contract
 export interface DesktopAPI {
+  appName: string
+  appVersion: string
   platform: string
+  isElectron: boolean
+  versions: {
+    electron: string
+    chrome: string
+    node: string
+  }
   getAppVersion: () => Promise<string>
   getBackendUrl: () => Promise<string>
   openExternal: (url: string) => Promise<boolean>
@@ -13,7 +21,15 @@ export interface DesktopAPI {
 }
 
 const desktopAPI: DesktopAPI = {
+  appName: 'DevPulse Desktop Client',
+  appVersion: '0.1.0',
   platform: process.platform,
+  isElectron: true,
+  versions: {
+    electron: process.versions.electron || '',
+    chrome: process.versions.chrome || '',
+    node: process.versions.node || '',
+  },
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   getBackendUrl: () => ipcRenderer.invoke('app:get-backend-url'),
   openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),

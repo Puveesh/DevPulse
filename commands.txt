@@ -45,8 +45,8 @@ npm run build
 npm run dist
 Generated Artifacts:
 File	Path	Description
-Installer	frontend/dist-electron/DevPulse Setup 0.0.0.exe	Windows NSIS installer wizard (with desktop & start menu shortcuts)
-Unpacked Executable	frontend/dist-electron/win-unpacked/DevPulse.exe	Standalone portable executable ready to run directly
+Installer	frontend/dist-electron/DevPulse Desktop Client Setup 0.1.0.exe	Windows NSIS installer wizard (with desktop & start menu shortcuts)
+Unpacked Executable	frontend/dist-electron/win-unpacked/DevPulse Desktop Client.exe	Standalone portable executable ready to run directly
 Fast Build Without Setup Installer (Direct .exe folder only):
 bash
 npm run dist:dir

@@ -135,7 +135,7 @@ export function ProjectModal({ isOpen, onClose, projectToEdit }: ProjectModalPro
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <Input
           label="Project Name *"
-          placeholder="e.g. devpulse-web-client"
+          placeholder="e.g. DevPulse Desktop Client"
           error={errors.name?.message}
           {...register('name')}
         />

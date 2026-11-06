@@ -52,7 +52,7 @@ export function LoginPage() {
             <Activity className="w-6 h-6 text-blue-500" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">DevPulse</h1>
-          <p className="text-xs text-zinc-400">Developer Worklog &amp; Analytics Platform</p>
+          <p className="text-xs text-zinc-400">DevPulse Desktop Client</p>
         </div>
 
         {/* Card */}
@@ -106,9 +106,12 @@ export function LoginPage() {
         </div>
 
         {/* Security notice */}
-        <div className="flex items-center justify-center gap-2 text-xs text-zinc-500">
-          <Lock className="w-3.5 h-3.5" />
-          <span>Secured with Spring Security &amp; JWT</span>
+        <div className="flex flex-col items-center justify-center gap-1 text-xs text-zinc-500">
+          <div className="flex items-center gap-1.5">
+            <Lock className="w-3.5 h-3.5" />
+            <span>Secured with Spring Security &amp; JWT</span>
+          </div>
+          <span className="text-[10px] text-zinc-600 font-mono">DevPulse Desktop Client &bull; v0.1.0</span>
         </div>
       </div>
     </div>

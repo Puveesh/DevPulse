@@ -1,7 +1,8 @@
 {
-  "name": "frontend",
+  "name": "devpulse-desktop-client",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "DevPulse Desktop Client - Developer Worklog & Analytics Platform",
   "type": "module",
   "main": "out/main/main.cjs",
   "scripts": {

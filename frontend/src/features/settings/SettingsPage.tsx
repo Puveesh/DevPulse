@@ -2,7 +2,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { User, Shield, Database } from 'lucide-react';
+import { User, Shield, Database, Monitor } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
 
 export function SettingsPage() {
@@ -92,6 +92,49 @@ export function SettingsPage() {
               Your projects, tasks, daily notes, and work session telemetry are isolated by your unique developer ID.
               No cross-user access is permitted at the API or database layer.
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Application & Desktop Runtime Info */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Monitor className="w-4 h-4 text-cyan-400" />
+              <CardTitle>Application &amp; Desktop Runtime</CardTitle>
+            </div>
+            <CardDescription>DevPulse Desktop Client environment details and telemetry</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-4 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between text-zinc-300">
+                <span>Application Name</span>
+                <span className="font-medium text-white">DevPulse Desktop Client</span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-300">
+                <span>Client Version</span>
+                <span className="font-mono text-zinc-400">v0.1.0 (Windows x64)</span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-300">
+                <span>Runtime Environment</span>
+                <span className="font-mono text-cyan-400">
+                  {typeof window !== 'undefined' && window.electronAPI?.isElectron
+                    ? `Electron ${window.electronAPI.versions.electron || ''} (Chromium ${window.electronAPI.versions.chrome || ''})`
+                    : 'DevPulse Desktop Runtime'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-300">
+                <span>Target Architecture</span>
+                <span className="font-mono text-zinc-400">Windows win32-x64</span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-300">
+                <span>Process Security</span>
+                <span className="font-mono text-emerald-400">Context Isolation &amp; Sandbox Active</span>
+              </div>
+              <div className="flex items-center justify-between text-zinc-300">
+                <span>Backend Service</span>
+                <span className="font-mono text-zinc-400">Spring Boot 3 API (Port 8081)</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
