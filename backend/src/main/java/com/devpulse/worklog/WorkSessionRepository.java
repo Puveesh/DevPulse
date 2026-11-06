@@ -3,11 +3,9 @@ package com.devpulse.worklog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,18 +14,15 @@ import java.util.UUID;
 public interface WorkSessionRepository extends JpaRepository<WorkSession, UUID> {
     Optional<WorkSession> findByIdAndUserId(UUID id, UUID userId);
 
-    Optional<WorkSession> findFirstByUserIdAndStatusOrderByStartedAtDesc(UUID userId, WorkSessionStatus status);
+    Optional<WorkSession> findFirstByUserIdAndStatusInOrderByStartedAtDesc(UUID userId, Collection<WorkSessionStatus> statuses);
 
-    Page<WorkSession> findByUserId(UUID userId, Pageable pageable);
+    boolean existsByUserIdAndStatusIn(UUID userId, Collection<WorkSessionStatus> statuses);
 
     Page<WorkSession> findByUserIdOrderByStartedAtDesc(UUID userId, Pageable pageable);
 
-    List<WorkSession> findTop10ByUserIdOrderByStartedAtDesc(UUID userId);
-
-    List<WorkSession> findByUserIdAndStartedAtBetween(UUID userId, Instant start, Instant end);
+    Page<WorkSession> findByUserIdAndStatusOrderByStartedAtDesc(UUID userId, WorkSessionStatus status, Pageable pageable);
 
     Page<WorkSession> findByProjectIdAndUserIdOrderByStartedAtDesc(UUID projectId, UUID userId, Pageable pageable);
 
-    @Query("SELECT COALESCE(SUM(ws.durationSeconds), 0) FROM WorkSession ws WHERE ws.userId = :userId AND ws.status = 'COMPLETED' AND ws.startedAt >= :since")
-    long getTotalDurationSecondsSince(@Param("userId") UUID userId, @Param("since") Instant since);
+    List<WorkSession> findTop10ByUserIdOrderByStartedAtDesc(UUID userId);
 }

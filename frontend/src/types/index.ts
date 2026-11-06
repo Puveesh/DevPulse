@@ -75,34 +75,46 @@ export interface PageResponse<T> {
   };
 }
 
-export type WorkSessionStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+export type WorkSessionStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED';
+
+export interface PauseInterval {
+  id: string;
+  pausedAt: string;
+  resumedAt?: string | null;
+}
 
 export interface WorkSession {
   id: string;
   userId: string;
-  projectId: string | null;
+  projectId: string;
   projectName?: string | null;
-  taskId: string | null;
+  taskId?: string | null;
   title: string;
-  notes: string | null;
+  initialNotes?: string | null;
+  sessionNotes?: string | null;
   startedAt: string;
-  endedAt: string | null;
-  durationSeconds: number | null;
+  endedAt?: string | null;
+  totalDurationSeconds?: number | null;
   status: WorkSessionStatus;
+  pauseIntervals?: PauseInterval[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface StartWorkSessionPayload {
-  projectId?: string | null;
+  projectId: string;
   taskId?: string | null;
   title: string;
-  notes?: string | null;
+  initialNotes?: string | null;
 }
 
 export interface EndWorkSessionPayload {
-  notes?: string | null;
+  sessionNotes?: string | null;
   endedAt?: string;
+}
+
+export interface UpdateSessionNotesPayload {
+  sessionNotes: string;
 }
 
 

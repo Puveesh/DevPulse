@@ -7,7 +7,6 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -18,7 +17,7 @@ public class WorkSession extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "project_id")
+    @Column(name = "project_id", nullable = false)
     private UUID projectId;
 
     @Column(name = "task_id")
@@ -27,8 +26,11 @@ public class WorkSession extends BaseEntity {
     @Column(name = "title", nullable = false)
     private String title;
 
-    @Column(name = "notes", columnDefinition = "TEXT")
-    private String notes;
+    @Column(name = "initial_notes", columnDefinition = "TEXT")
+    private String initialNotes;
+
+    @Column(name = "session_notes", columnDefinition = "TEXT")
+    private String sessionNotes;
 
     @Column(name = "started_at", nullable = false)
     private Instant startedAt;
@@ -36,8 +38,8 @@ public class WorkSession extends BaseEntity {
     @Column(name = "ended_at")
     private Instant endedAt;
 
-    @Column(name = "duration_seconds")
-    private Long durationSeconds;
+    @Column(name = "total_duration_seconds")
+    private Long totalDurationSeconds;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
@@ -46,34 +48,14 @@ public class WorkSession extends BaseEntity {
     public WorkSession() {
     }
 
-    public WorkSession(UUID userId, UUID projectId, UUID taskId, String title, String notes, Instant startedAt) {
+    public WorkSession(UUID userId, UUID projectId, UUID taskId, String title, String initialNotes, Instant startedAt) {
         this.userId = userId;
         this.projectId = projectId;
         this.taskId = taskId;
         this.title = title;
-        this.notes = notes;
+        this.initialNotes = initialNotes;
         this.startedAt = startedAt != null ? startedAt : Instant.now();
         this.status = WorkSessionStatus.ACTIVE;
-    }
-
-    public void completeSession(Instant endTime) {
-        Instant actualEnd = endTime != null ? endTime : Instant.now();
-        if (actualEnd.isBefore(this.startedAt)) {
-            actualEnd = this.startedAt;
-        }
-        this.endedAt = actualEnd;
-        this.durationSeconds = Duration.between(this.startedAt, actualEnd).getSeconds();
-        this.status = WorkSessionStatus.COMPLETED;
-    }
-
-    public void cancelSession() {
-        Instant actualEnd = Instant.now();
-        if (actualEnd.isBefore(this.startedAt)) {
-            actualEnd = this.startedAt;
-        }
-        this.endedAt = actualEnd;
-        this.durationSeconds = Duration.between(this.startedAt, actualEnd).getSeconds();
-        this.status = WorkSessionStatus.CANCELLED;
     }
 
     public UUID getUserId() {
@@ -108,12 +90,20 @@ public class WorkSession extends BaseEntity {
         this.title = title;
     }
 
-    public String getNotes() {
-        return notes;
+    public String getInitialNotes() {
+        return initialNotes;
     }
 
-    public void setNotes(String notes) {
-        this.notes = notes;
+    public void setInitialNotes(String initialNotes) {
+        this.initialNotes = initialNotes;
+    }
+
+    public String getSessionNotes() {
+        return sessionNotes;
+    }
+
+    public void setSessionNotes(String sessionNotes) {
+        this.sessionNotes = sessionNotes;
     }
 
     public Instant getStartedAt() {
@@ -132,12 +122,12 @@ public class WorkSession extends BaseEntity {
         this.endedAt = endedAt;
     }
 
-    public Long getDurationSeconds() {
-        return durationSeconds;
+    public Long getTotalDurationSeconds() {
+        return totalDurationSeconds;
     }
 
-    public void setDurationSeconds(Long durationSeconds) {
-        this.durationSeconds = durationSeconds;
+    public void setTotalDurationSeconds(Long totalDurationSeconds) {
+        this.totalDurationSeconds = totalDurationSeconds;
     }
 
     public WorkSessionStatus getStatus() {
@@ -148,4 +138,3 @@ public class WorkSession extends BaseEntity {
         this.status = status;
     }
 }
-

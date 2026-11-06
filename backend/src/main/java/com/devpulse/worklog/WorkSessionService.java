@@ -1,20 +1,23 @@
 package com.devpulse.worklog;
 
 import com.devpulse.common.BadRequestException;
+import com.devpulse.common.ConflictException;
 import com.devpulse.common.ResourceNotFoundException;
 import com.devpulse.project.Project;
 import com.devpulse.project.ProjectRepository;
 import com.devpulse.worklog.dto.EndWorkSessionRequest;
+import com.devpulse.worklog.dto.PauseIntervalDto;
 import com.devpulse.worklog.dto.StartWorkSessionRequest;
+import com.devpulse.worklog.dto.UpdateSessionNotesRequest;
 import com.devpulse.worklog.dto.WorkSessionResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -26,27 +29,31 @@ import java.util.stream.Collectors;
 public class WorkSessionService {
 
     private final WorkSessionRepository workSessionRepository;
+    private final SessionPauseIntervalRepository pauseIntervalRepository;
     private final ProjectRepository projectRepository;
 
-    public WorkSessionService(WorkSessionRepository workSessionRepository, ProjectRepository projectRepository) {
+    public WorkSessionService(WorkSessionRepository workSessionRepository,
+                              SessionPauseIntervalRepository pauseIntervalRepository,
+                              ProjectRepository projectRepository) {
         this.workSessionRepository = workSessionRepository;
+        this.pauseIntervalRepository = pauseIntervalRepository;
         this.projectRepository = projectRepository;
     }
 
     @Transactional
     public WorkSessionResponse startSession(UUID userId, StartWorkSessionRequest request) {
-        // Auto-complete any existing active session for this user to prevent orphaned sessions
-        workSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(userId, WorkSessionStatus.ACTIVE)
-                .ifPresent(active -> {
-                    active.completeSession(Instant.now());
-                    workSessionRepository.save(active);
-                });
+        if (request.projectId() == null) {
+            throw new BadRequestException("Project selection is mandatory");
+        }
 
-        String projectName = null;
-        if (request.projectId() != null) {
-            Project project = projectRepository.findByIdAndUserId(request.projectId(), userId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + request.projectId()));
-            projectName = project.getName();
+        Project project = projectRepository.findByIdAndUserId(request.projectId(), userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + request.projectId()));
+
+        boolean hasActive = workSessionRepository.existsByUserIdAndStatusIn(
+                userId, List.of(WorkSessionStatus.ACTIVE, WorkSessionStatus.PAUSED)
+        );
+        if (hasActive) {
+            throw new ConflictException("You already have an active or paused work session in progress. Please end it before starting a new one.");
         }
 
         WorkSession session = new WorkSession(
@@ -54,21 +61,77 @@ public class WorkSessionService {
                 request.projectId(),
                 request.taskId(),
                 request.title().trim(),
-                request.notes() != null && !request.notes().isBlank() ? request.notes().trim() : null,
+                request.initialNotes() != null && !request.initialNotes().isBlank() ? request.initialNotes().trim() : null,
                 Instant.now()
         );
 
         WorkSession savedSession = workSessionRepository.save(session);
-        return WorkSessionResponse.fromSession(savedSession, projectName);
+        return WorkSessionResponse.fromSession(savedSession, project.getName(), 0L, List.of());
     }
 
     @Transactional(readOnly = true)
     public Optional<WorkSessionResponse> getActiveSession(UUID userId) {
-        return workSessionRepository.findFirstByUserIdAndStatusOrderByStartedAtDesc(userId, WorkSessionStatus.ACTIVE)
-                .map(session -> {
-                    String projectName = resolveProjectName(session.getProjectId(), userId);
-                    return WorkSessionResponse.fromSession(session, projectName);
-                });
+        return workSessionRepository.findFirstByUserIdAndStatusInOrderByStartedAtDesc(
+                userId, List.of(WorkSessionStatus.ACTIVE, WorkSessionStatus.PAUSED)
+        ).map(session -> {
+            String projectName = resolveProjectName(session.getProjectId(), userId);
+            List<SessionPauseInterval> intervals = pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(session.getId());
+            long workingSeconds = calculateWorkingDurationSeconds(session, intervals, Instant.now());
+            List<PauseIntervalDto> intervalDtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+            return WorkSessionResponse.fromSession(session, projectName, workingSeconds, intervalDtos);
+        });
+    }
+
+    @Transactional
+    public WorkSessionResponse pauseSession(UUID userId, UUID sessionId) {
+        WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
+
+        if (session.getStatus() != WorkSessionStatus.ACTIVE) {
+            throw new BadRequestException("Only an active session can be paused. Current status: " + session.getStatus());
+        }
+
+        SessionPauseInterval pauseInterval = new SessionPauseInterval(sessionId, Instant.now());
+        pauseIntervalRepository.save(pauseInterval);
+
+        session.setStatus(WorkSessionStatus.PAUSED);
+
+        List<SessionPauseInterval> intervals = new ArrayList<>(
+                pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(sessionId)
+        );
+        long workingSeconds = calculateWorkingDurationSeconds(session, intervals, Instant.now());
+        session.setTotalDurationSeconds(workingSeconds);
+
+        WorkSession saved = workSessionRepository.save(session);
+        String projectName = resolveProjectName(saved.getProjectId(), userId);
+        List<PauseIntervalDto> dtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+        return WorkSessionResponse.fromSession(saved, projectName, workingSeconds, dtos);
+    }
+
+    @Transactional
+    public WorkSessionResponse resumeSession(UUID userId, UUID sessionId) {
+        WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
+
+        if (session.getStatus() != WorkSessionStatus.PAUSED) {
+            throw new BadRequestException("Only a paused session can be resumed. Current status: " + session.getStatus());
+        }
+
+        SessionPauseInterval openPause = pauseIntervalRepository
+                .findFirstBySessionIdAndResumedAtIsNullOrderByPausedAtDesc(sessionId)
+                .orElseThrow(() -> new BadRequestException("No open pause interval found for this session"));
+
+        openPause.setResumedAt(Instant.now());
+        pauseIntervalRepository.save(openPause);
+
+        session.setStatus(WorkSessionStatus.ACTIVE);
+        WorkSession saved = workSessionRepository.save(session);
+
+        List<SessionPauseInterval> intervals = pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(sessionId);
+        long workingSeconds = calculateWorkingDurationSeconds(saved, intervals, Instant.now());
+        String projectName = resolveProjectName(saved.getProjectId(), userId);
+        List<PauseIntervalDto> dtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+        return WorkSessionResponse.fromSession(saved, projectName, workingSeconds, dtos);
     }
 
     @Transactional
@@ -76,49 +139,66 @@ public class WorkSessionService {
         WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
 
-        if (session.getStatus() != WorkSessionStatus.ACTIVE) {
-            throw new BadRequestException("Work session is not currently active: " + session.getStatus());
+        if (session.getStatus() == WorkSessionStatus.COMPLETED) {
+            throw new BadRequestException("Work session is already completed");
         }
 
-        if (request != null && request.notes() != null && !request.notes().isBlank()) {
-            String existingNotes = session.getNotes();
-            if (existingNotes != null && !existingNotes.isBlank()) {
-                session.setNotes(existingNotes + "\n" + request.notes().trim());
-            } else {
-                session.setNotes(request.notes().trim());
-            }
+        Instant now = Instant.now();
+
+        // Close any unfinished pause interval
+        pauseIntervalRepository.findFirstBySessionIdAndResumedAtIsNullOrderByPausedAtDesc(sessionId)
+                .ifPresent(openPause -> {
+                    openPause.setResumedAt(now);
+                    pauseIntervalRepository.save(openPause);
+                });
+
+        Instant endTime = (request != null && request.endedAt() != null) ? request.endedAt() : now;
+        if (endTime.isBefore(session.getStartedAt())) {
+            endTime = session.getStartedAt();
         }
 
-        Instant endTime = (request != null && request.endedAt() != null) ? request.endedAt() : Instant.now();
-        session.completeSession(endTime);
+        session.setEndedAt(endTime);
+        session.setStatus(WorkSessionStatus.COMPLETED);
+
+        if (request != null && request.sessionNotes() != null && !request.sessionNotes().isBlank()) {
+            session.setSessionNotes(request.sessionNotes().trim());
+        }
+
+        List<SessionPauseInterval> intervals = pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(sessionId);
+        long totalWorkingSeconds = calculateWorkingDurationSeconds(session, intervals, endTime);
+        session.setTotalDurationSeconds(totalWorkingSeconds);
 
         WorkSession saved = workSessionRepository.save(session);
         String projectName = resolveProjectName(saved.getProjectId(), userId);
-        return WorkSessionResponse.fromSession(saved, projectName);
-    }
-
-    @Transactional
-    public WorkSessionResponse cancelSession(UUID userId, UUID sessionId) {
-        WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
-
-        if (session.getStatus() == WorkSessionStatus.ACTIVE) {
-            session.cancelSession();
-            session = workSessionRepository.save(session);
-        }
-
-        String projectName = resolveProjectName(session.getProjectId(), userId);
-        return WorkSessionResponse.fromSession(session, projectName);
+        List<PauseIntervalDto> dtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+        return WorkSessionResponse.fromSession(saved, projectName, totalWorkingSeconds, dtos);
     }
 
     @Transactional(readOnly = true)
-    public List<WorkSessionResponse> getRecentSessions(UUID userId) {
-        List<WorkSession> sessions = workSessionRepository.findTop10ByUserIdOrderByStartedAtDesc(userId);
-        Map<UUID, String> projectNames = fetchProjectNames(sessions, userId);
+    public WorkSessionResponse getSessionById(UUID userId, UUID sessionId) {
+        WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
 
-        return sessions.stream()
-                .map(s -> WorkSessionResponse.fromSession(s, s.getProjectId() != null ? projectNames.get(s.getProjectId()) : null))
-                .toList();
+        String projectName = resolveProjectName(session.getProjectId(), userId);
+        List<SessionPauseInterval> intervals = pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(sessionId);
+        long workingSeconds = calculateWorkingDurationSeconds(session, intervals, Instant.now());
+        List<PauseIntervalDto> dtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+        return WorkSessionResponse.fromSession(session, projectName, workingSeconds, dtos);
+    }
+
+    @Transactional
+    public WorkSessionResponse updateSessionNotes(UUID userId, UUID sessionId, UpdateSessionNotesRequest request) {
+        WorkSession session = workSessionRepository.findByIdAndUserId(sessionId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Work session not found with id: " + sessionId));
+
+        session.setSessionNotes(request.sessionNotes() != null ? request.sessionNotes().trim() : null);
+        WorkSession saved = workSessionRepository.save(session);
+
+        String projectName = resolveProjectName(saved.getProjectId(), userId);
+        List<SessionPauseInterval> intervals = pauseIntervalRepository.findBySessionIdOrderByPausedAtAsc(sessionId);
+        long workingSeconds = calculateWorkingDurationSeconds(saved, intervals, Instant.now());
+        List<PauseIntervalDto> dtos = intervals.stream().map(PauseIntervalDto::fromEntity).toList();
+        return WorkSessionResponse.fromSession(saved, projectName, workingSeconds, dtos);
     }
 
     @Transactional(readOnly = true)
@@ -126,13 +206,39 @@ public class WorkSessionService {
         Page<WorkSession> page = workSessionRepository.findByUserIdOrderByStartedAtDesc(userId, pageable);
         Map<UUID, String> projectNames = fetchProjectNames(page.getContent(), userId);
 
-        return page.map(s -> WorkSessionResponse.fromSession(s, s.getProjectId() != null ? projectNames.get(s.getProjectId()) : null));
+        return page.map(s -> {
+            String projectName = s.getProjectId() != null ? projectNames.get(s.getProjectId()) : null;
+            return WorkSessionResponse.fromSession(s, projectName, s.getTotalDurationSeconds(), List.of());
+        });
     }
 
-    @Transactional(readOnly = true)
-    public long getTodayLoggedDurationSeconds(UUID userId) {
-        Instant startOfDay = LocalDate.now(ZoneOffset.UTC).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return workSessionRepository.getTotalDurationSecondsSince(userId, startOfDay);
+    public long calculateWorkingDurationSeconds(WorkSession session, List<SessionPauseInterval> pauseIntervals, Instant asOf) {
+        if (session == null || session.getStartedAt() == null) {
+            return 0L;
+        }
+
+        Instant ceiling = session.getEndedAt() != null ? session.getEndedAt() : asOf;
+        long closedPausedSeconds = 0L;
+
+        for (SessionPauseInterval interval : pauseIntervals) {
+            if (interval.getResumedAt() != null) {
+                long diff = Duration.between(interval.getPausedAt(), interval.getResumedAt()).getSeconds();
+                closedPausedSeconds += Math.max(0L, diff);
+            } else {
+                // Open pause interval - pause in progress
+                if (interval.getPausedAt().isBefore(ceiling)) {
+                    ceiling = interval.getPausedAt();
+                }
+            }
+        }
+
+        if (ceiling.isBefore(session.getStartedAt())) {
+            return 0L;
+        }
+
+        long totalWallClockSeconds = Duration.between(session.getStartedAt(), ceiling).getSeconds();
+        long workingSeconds = totalWallClockSeconds - closedPausedSeconds;
+        return Math.max(0L, workingSeconds);
     }
 
     private String resolveProjectName(UUID projectId, UUID userId) {

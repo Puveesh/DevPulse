@@ -4,7 +4,9 @@ import type {
   WorkSession,
   StartWorkSessionPayload,
   EndWorkSessionPayload,
+  UpdateSessionNotesPayload,
   ApiResponse,
+  PageResponse,
 } from '../types';
 
 export function useActiveSession() {
@@ -18,36 +20,42 @@ export function useActiveSession() {
         return null;
       }
     },
-    refetchInterval: 10000, // Sync active session state across windows/tabs every 10s
+    refetchInterval: 5000,
   });
 }
 
-export function useRecentSessions() {
+export function useWorkSessions(page = 0, size = 20) {
   return useQuery({
-    queryKey: ['work-sessions', 'recent'],
+    queryKey: ['work-sessions', 'list', page, size],
     queryFn: async () => {
       try {
-        const res = await apiClient.get<ApiResponse<WorkSession[]>>('/work-sessions/recent');
-        return res.data.data || [];
+        const res = await apiClient.get<ApiResponse<PageResponse<WorkSession> | WorkSession[]>>(
+          `/work-sessions?page=${page}&size=${size}`
+        );
+        const data = res.data.data;
+        if (Array.isArray(data)) {
+          return { content: data, totalElements: data.length };
+        }
+        return {
+          content: data.content || [],
+          totalElements: data.page?.totalElements || data.content?.length || 0,
+        };
       } catch {
-        return [];
+        return { content: [], totalElements: 0 };
       }
     },
   });
 }
 
-export function useTodayDuration() {
+export function useWorkSession(id?: string) {
   return useQuery({
-    queryKey: ['work-sessions', 'today-duration'],
+    queryKey: ['work-sessions', id],
     queryFn: async () => {
-      try {
-        const res = await apiClient.get<ApiResponse<number>>('/work-sessions/today-duration');
-        return res.data.data ?? 0;
-      } catch {
-        return 0;
-      }
+      if (!id) return null;
+      const res = await apiClient.get<ApiResponse<WorkSession>>(`/work-sessions/${id}`);
+      return res.data.data;
     },
-    refetchInterval: 15000,
+    enabled: !!id,
   });
 }
 
@@ -58,6 +66,42 @@ export function useStartSession() {
     mutationFn: async (payload: StartWorkSessionPayload) => {
       try {
         const res = await apiClient.post<ApiResponse<WorkSession>>('/work-sessions/start', payload);
+        return res.data.data;
+      } catch (err) {
+        throw new Error(extractErrorMessage(err));
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-sessions'] });
+    },
+  });
+}
+
+export function usePauseSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        const res = await apiClient.post<ApiResponse<WorkSession>>(`/work-sessions/${id}/pause`);
+        return res.data.data;
+      } catch (err) {
+        throw new Error(extractErrorMessage(err));
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-sessions'] });
+    },
+  });
+}
+
+export function useResumeSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        const res = await apiClient.post<ApiResponse<WorkSession>>(`/work-sessions/${id}/resume`);
         return res.data.data;
       } catch (err) {
         throw new Error(extractErrorMessage(err));
@@ -87,20 +131,21 @@ export function useEndSession() {
   });
 }
 
-export function useCancelSession() {
+export function useUpdateSessionNotes() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (id: string) => {
+    mutationFn: async ({ id, payload }: { id: string; payload: UpdateSessionNotesPayload }) => {
       try {
-        const res = await apiClient.post<ApiResponse<WorkSession>>(`/work-sessions/${id}/cancel`);
+        const res = await apiClient.patch<ApiResponse<WorkSession>>(`/work-sessions/${id}/notes`, payload);
         return res.data.data;
       } catch (err) {
         throw new Error(extractErrorMessage(err));
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['work-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['work-sessions', variables.id] });
     },
   });
 }

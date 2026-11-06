@@ -4,6 +4,7 @@ import com.devpulse.common.ApiResponse;
 import com.devpulse.security.UserPrincipal;
 import com.devpulse.worklog.dto.EndWorkSessionRequest;
 import com.devpulse.worklog.dto.StartWorkSessionRequest;
+import com.devpulse.worklog.dto.UpdateSessionNotesRequest;
 import com.devpulse.worklog.dto.WorkSessionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -17,13 +18,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -49,15 +50,33 @@ public class WorkSessionController {
     }
 
     @GetMapping("/active")
-    @Operation(summary = "Get active work session", description = "Retrieves current active session if one is in progress")
+    @Operation(summary = "Get active work session", description = "Retrieves current active or paused session if one is in progress")
     public ResponseEntity<ApiResponse<WorkSessionResponse>> getActiveSession(
             @AuthenticationPrincipal UserPrincipal principal) {
         WorkSessionResponse activeSession = workSessionService.getActiveSession(principal.getId()).orElse(null);
         return ResponseEntity.ok(ApiResponse.success("Active session fetched", activeSession));
     }
 
+    @PostMapping("/{id}/pause")
+    @Operation(summary = "Pause a work session", description = "Pauses an active session and records the pause interval")
+    public ResponseEntity<ApiResponse<WorkSessionResponse>> pauseSession(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        WorkSessionResponse session = workSessionService.pauseSession(principal.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Work session paused", session));
+    }
+
+    @PostMapping("/{id}/resume")
+    @Operation(summary = "Resume a work session", description = "Resumes a paused session and closes the pause interval")
+    public ResponseEntity<ApiResponse<WorkSessionResponse>> resumeSession(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        WorkSessionResponse session = workSessionService.resumeSession(principal.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Work session resumed", session));
+    }
+
     @PostMapping("/{id}/end")
-    @Operation(summary = "End a work session", description = "Stops an active session, computes duration, and persists notes")
+    @Operation(summary = "End a work session", description = "Stops a session, computes working duration excluding pauses, and persists session notes")
     public ResponseEntity<ApiResponse<WorkSessionResponse>> endSession(
             @PathVariable UUID id,
             @RequestBody(required = false) EndWorkSessionRequest request,
@@ -66,37 +85,31 @@ public class WorkSessionController {
         return ResponseEntity.ok(ApiResponse.success("Work session completed successfully", session));
     }
 
-    @PostMapping("/{id}/cancel")
-    @Operation(summary = "Cancel a work session", description = "Cancels an in-progress work session")
-    public ResponseEntity<ApiResponse<WorkSessionResponse>> cancelSession(
+    @GetMapping("/{id}")
+    @Operation(summary = "Get work session by ID", description = "Retrieves details of a specific session owned by the authenticated user")
+    public ResponseEntity<ApiResponse<WorkSessionResponse>> getSessionById(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserPrincipal principal) {
-        WorkSessionResponse session = workSessionService.cancelSession(principal.getId(), id);
-        return ResponseEntity.ok(ApiResponse.success("Work session cancelled", session));
+        WorkSessionResponse session = workSessionService.getSessionById(principal.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Work session retrieved successfully", session));
     }
 
-    @GetMapping("/recent")
-    @Operation(summary = "List recent work sessions", description = "Retrieves up to 10 recent work sessions")
-    public ResponseEntity<ApiResponse<List<WorkSessionResponse>>> getRecentSessions(
+    @PatchMapping("/{id}/notes")
+    @Operation(summary = "Update session notes", description = "Allows editing the remarks and notes of an existing session")
+    public ResponseEntity<ApiResponse<WorkSessionResponse>> updateSessionNotes(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateSessionNotesRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        List<WorkSessionResponse> sessions = workSessionService.getRecentSessions(principal.getId());
-        return ResponseEntity.ok(ApiResponse.success("Recent sessions retrieved successfully", sessions));
+        WorkSessionResponse session = workSessionService.updateSessionNotes(principal.getId(), id, request);
+        return ResponseEntity.ok(ApiResponse.success("Session notes updated successfully", session));
     }
 
     @GetMapping
-    @Operation(summary = "List all work sessions", description = "Retrieves paginated work sessions for the user")
+    @Operation(summary = "List work sessions", description = "Retrieves paginated work sessions for the user")
     public ResponseEntity<ApiResponse<Page<WorkSessionResponse>>> getSessions(
             @PageableDefault(size = 20, sort = "startedAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal UserPrincipal principal) {
         Page<WorkSessionResponse> sessions = workSessionService.getSessions(principal.getId(), pageable);
         return ResponseEntity.ok(ApiResponse.success("Work sessions retrieved successfully", sessions));
-    }
-
-    @GetMapping("/today-duration")
-    @Operation(summary = "Get today's total logged seconds", description = "Retrieves total seconds spent in completed sessions today")
-    public ResponseEntity<ApiResponse<Long>> getTodayLoggedDuration(
-            @AuthenticationPrincipal UserPrincipal principal) {
-        long seconds = workSessionService.getTodayLoggedDurationSeconds(principal.getId());
-        return ResponseEntity.ok(ApiResponse.success("Today's logged seconds retrieved", seconds));
     }
 }

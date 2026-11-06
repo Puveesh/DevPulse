@@ -1,45 +1,56 @@
 import { useState, useEffect } from 'react';
 import {
   useActiveSession,
-  useRecentSessions,
-  useTodayDuration,
-  useCancelSession,
+  useWorkSessions,
+  usePauseSession,
+  useResumeSession,
 } from '../../hooks/useWorkSessions';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/common/EmptyState';
-import { Clock, Play, Square, X, Calendar, FileText } from 'lucide-react';
-import { formatDate, formatDuration } from '../../lib/utils';
+import { Clock, Play, Pause, Square, FileText, Calendar, FolderKanban } from 'lucide-react';
+import { formatDate, formatTime, formatDuration, calculateWorkingSeconds } from '../../lib/utils';
 import { StartSessionModal } from './StartSessionModal';
 import { EndSessionModal } from './EndSessionModal';
+import { SessionDetailModal } from './SessionDetailModal';
+import type { WorkSession } from '../../types';
 
 export function WorkSessionsPage() {
   const { data: activeSession } = useActiveSession();
-  const { data: sessions = [], isLoading } = useRecentSessions();
-  const { data: todayDuration = 0 } = useTodayDuration();
-  const cancelSessionMutation = useCancelSession();
+  const { data: sessionsData, isLoading } = useWorkSessions(0, 50);
+  const pauseSessionMutation = usePauseSession();
+  const resumeSessionMutation = useResumeSession();
 
   const [isStartModalOpen, setIsStartModalOpen] = useState(false);
   const [isEndModalOpen, setIsEndModalOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<WorkSession | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
-    if (!activeSession?.startedAt) {
+    if (!activeSession) {
       setElapsedSeconds(0);
       return;
     }
 
-    const updateElapsed = () => {
-      const start = new Date(activeSession.startedAt).getTime();
-      const now = Date.now();
-      const diff = Math.max(0, Math.floor((now - start) / 1000));
-      setElapsedSeconds(diff);
+    const updateTime = () => {
+      const calculated = calculateWorkingSeconds(
+        activeSession.startedAt,
+        activeSession.endedAt,
+        activeSession.pauseIntervals
+      );
+      setElapsedSeconds(calculated);
     };
 
-    updateElapsed();
-    const interval = setInterval(updateElapsed, 1000);
-    return () => clearInterval(interval);
-  }, [activeSession?.startedAt]);
+    updateTime();
+
+    if (activeSession.status === 'ACTIVE') {
+      const interval = setInterval(updateTime, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [activeSession]);
+
+  const allSessions = sessionsData?.content || [];
+  const completedSessions = allSessions.filter((s) => s.status === 'COMPLETED');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -74,34 +85,73 @@ export function WorkSessionsPage() {
         </div>
       </div>
 
-      {/* Active Session Banner if in progress */}
+      {/* Active Session Banner if in progress or paused */}
       {activeSession && (
-        <Card className="border-emerald-500/30 bg-emerald-950/20">
+        <Card className="border-zinc-800 bg-zinc-900/60 p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
-                  Active Session in Progress
-                </span>
+                {activeSession.status === 'ACTIVE' ? (
+                  <>
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                      Active Session in Progress
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+                      Session Paused
+                    </span>
+                  </>
+                )}
               </div>
               <h3 className="text-lg font-bold text-white">{activeSession.title}</h3>
-              {activeSession.projectName && (
-                <p className="text-xs text-zinc-400">Project: {activeSession.projectName}</p>
-              )}
+              <div className="flex items-center gap-4 text-xs text-zinc-400">
+                <span className="flex items-center gap-1">
+                  <FolderKanban className="w-3.5 h-3.5 text-blue-400" />
+                  {activeSession.projectName}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-zinc-500" />
+                  Started {formatTime(activeSession.startedAt)}
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <span className="text-xs text-zinc-400 block">Elapsed Time</span>
+                <span className="text-xs text-zinc-400 block">Working Time</span>
                 <span className="text-2xl font-bold font-mono text-emerald-300">
                   {formatDuration(elapsedSeconds)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                {activeSession.status === 'ACTIVE' ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    leftIcon={<Pause className="w-3.5 h-3.5 text-amber-400" />}
+                    isLoading={pauseSessionMutation.isPending}
+                    onClick={() => pauseSessionMutation.mutate(activeSession.id)}
+                  >
+                    Pause
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    leftIcon={<Play className="w-3.5 h-3.5 text-emerald-400" />}
+                    isLoading={resumeSessionMutation.isPending}
+                    onClick={() => resumeSessionMutation.mutate(activeSession.id)}
+                  >
+                    Resume
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="primary"
@@ -111,51 +161,11 @@ export function WorkSessionsPage() {
                 >
                   End & Save
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (window.confirm('Cancel this active session? Time will not be recorded.')) {
-                      cancelSessionMutation.mutate(activeSession.id);
-                    }
-                  }}
-                >
-                  <X className="w-4 h-4 text-zinc-400" />
-                </Button>
               </div>
             </div>
           </div>
         </Card>
       )}
-
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="p-4 bg-zinc-900/40 border-zinc-800/80">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-zinc-400">Today's Total Time</span>
-              <div className="text-2xl font-bold font-mono text-zinc-100">
-                {formatDuration(todayDuration + (activeSession ? elapsedSeconds : 0))}
-              </div>
-            </div>
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
-              <Clock className="w-5 h-5" />
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-zinc-900/40 border-zinc-800/80">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-xs font-medium text-zinc-400">Recorded Sessions</span>
-              <div className="text-2xl font-bold font-mono text-zinc-100">{sessions.length}</div>
-            </div>
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
-              <Calendar className="w-5 h-5" />
-            </div>
-          </div>
-        </Card>
-      </div>
 
       {/* Sessions History List */}
       <Card>
@@ -166,33 +176,55 @@ export function WorkSessionsPage() {
         <CardContent>
           {isLoading ? (
             <div className="p-6 text-center text-xs text-zinc-500">Loading work sessions...</div>
-          ) : sessions.length > 0 ? (
+          ) : completedSessions.length > 0 ? (
             <div className="divide-y divide-zinc-800/80">
-              {sessions.map((session) => (
-                <div key={session.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {completedSessions.map((session) => (
+                <div
+                  key={session.id}
+                  onClick={() => setSelectedSession(session)}
+                  className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-900/40 p-2.5 rounded-lg transition-colors cursor-pointer"
+                >
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-zinc-100 truncate">{session.title}</span>
-                      <span className="text-[10px] uppercase font-medium px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300">
+                      <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-zinc-300">
                         {session.status}
                       </span>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-zinc-400">
-                      {session.projectName && <span>Project: {session.projectName}</span>}
-                      <span>Started: {formatDate(session.startedAt)}</span>
+                      <span className="flex items-center gap-1">
+                        <FolderKanban className="w-3.5 h-3.5 text-blue-400" />
+                        {session.projectName}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+                        {formatDate(session.startedAt)}
+                      </span>
+                      <span>
+                        {formatTime(session.startedAt)} &rarr; {session.endedAt ? formatTime(session.endedAt) : ''}
+                      </span>
                     </div>
-                    {session.notes && (
-                      <p className="text-xs text-zinc-400 mt-1 flex items-start gap-1.5 italic">
-                        <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-zinc-500" />
-                        <span>{session.notes}</span>
+
+                    {session.initialNotes && (
+                      <p className="text-xs text-zinc-400 flex items-start gap-1.5 italic">
+                        <span className="text-zinc-500 not-italic">Initial:</span>
+                        <span>{session.initialNotes}</span>
+                      </p>
+                    )}
+
+                    {session.sessionNotes && (
+                      <p className="text-xs text-zinc-300 flex items-start gap-1.5">
+                        <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-400" />
+                        <span className="line-clamp-2">{session.sessionNotes}</span>
                       </p>
                     )}
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="text-sm font-bold font-mono text-zinc-200">
-                      {formatDuration(session.durationSeconds || 0)}
+                    <span className="text-sm font-bold font-mono text-zinc-200 block">
+                      {formatDuration(session.totalDurationSeconds || 0)}
                     </span>
+                    <span className="text-[10px] text-blue-400 hover:underline">View & Edit Notes</span>
                   </div>
                 </div>
               ))}
@@ -223,6 +255,12 @@ export function WorkSessionsPage() {
           elapsedSeconds={elapsedSeconds}
         />
       )}
+
+      <SessionDetailModal
+        isOpen={!!selectedSession}
+        onClose={() => setSelectedSession(null)}
+        session={selectedSession}
+      />
     </div>
   );
 }

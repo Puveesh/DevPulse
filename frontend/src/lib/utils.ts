@@ -44,4 +44,58 @@ export function formatDuration(totalSeconds: number): string {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
+export function formatDurationHM(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds < 0) totalSeconds = 0;
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}`;
+}
+
+export function formatTime(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).format(date);
+  } catch {
+    return dateString;
+  }
+}
+
+export function calculateWorkingSeconds(
+  startedAt: string,
+  endedAt?: string | null,
+  pauseIntervals?: { pausedAt: string; resumedAt?: string | null }[],
+  asOfNow = Date.now()
+): number {
+  const startTime = new Date(startedAt).getTime();
+  if (isNaN(startTime)) return 0;
+
+  let ceilingTime = endedAt ? new Date(endedAt).getTime() : asOfNow;
+  let closedPausedMs = 0;
+
+  if (pauseIntervals && pauseIntervals.length > 0) {
+    for (const interval of pauseIntervals) {
+      const pausedTime = new Date(interval.pausedAt).getTime();
+      if (interval.resumedAt) {
+        const resumedTime = new Date(interval.resumedAt).getTime();
+        if (resumedTime > pausedTime) {
+          closedPausedMs += resumedTime - pausedTime;
+        }
+      } else {
+        if (pausedTime < ceilingTime) {
+          ceilingTime = pausedTime;
+        }
+      }
+    }
+  }
+
+  const workingMs = ceilingTime - startTime - closedPausedMs;
+  return Math.max(0, Math.floor(workingMs / 1000));
+}
+
 

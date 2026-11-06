@@ -4,6 +4,7 @@ import com.devpulse.worklog.WorkSession;
 import com.devpulse.worklog.WorkSessionStatus;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record WorkSessionResponse(
@@ -13,15 +14,26 @@ public record WorkSessionResponse(
         String projectName,
         UUID taskId,
         String title,
-        String notes,
+        String initialNotes,
+        String sessionNotes,
         Instant startedAt,
         Instant endedAt,
-        Long durationSeconds,
+        Long totalDurationSeconds,
         WorkSessionStatus status,
+        List<PauseIntervalDto> pauseIntervals,
         Instant createdAt,
         Instant updatedAt
 ) {
-    public static WorkSessionResponse fromSession(WorkSession session, String projectName) {
+    public static WorkSessionResponse fromSession(
+            WorkSession session,
+            String projectName,
+            Long currentWorkingSeconds,
+            List<PauseIntervalDto> intervals
+    ) {
+        Long duration = session.getStatus() == WorkSessionStatus.COMPLETED
+                ? session.getTotalDurationSeconds()
+                : currentWorkingSeconds;
+
         return new WorkSessionResponse(
                 session.getId(),
                 session.getUserId(),
@@ -29,11 +41,13 @@ public record WorkSessionResponse(
                 projectName,
                 session.getTaskId(),
                 session.getTitle(),
-                session.getNotes(),
+                session.getInitialNotes(),
+                session.getSessionNotes(),
                 session.getStartedAt(),
                 session.getEndedAt(),
-                session.getDurationSeconds(),
+                duration,
                 session.getStatus(),
+                intervals != null ? intervals : List.of(),
                 session.getCreatedAt(),
                 session.getUpdatedAt()
         );

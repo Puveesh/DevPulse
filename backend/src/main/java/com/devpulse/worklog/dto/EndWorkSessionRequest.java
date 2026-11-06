@@ -3,7 +3,7 @@ package com.devpulse.worklog.dto;
 import java.time.Instant;
 
 public record EndWorkSessionRequest(
-        String notes,
+        String sessionNotes,
         Instant endedAt
 ) {
 }
