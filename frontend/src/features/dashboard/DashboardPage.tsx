@@ -25,6 +25,7 @@ import {
 import { formatDate, formatDuration, formatTime, formatDurationHoursMinutes } from '../../lib/utils';
 import { SessionDetailModal } from '../worklog/SessionDetailModal';
 import { WeeklyActivityChart } from './WeeklyActivityChart';
+import { WeeklyStatisticsModal } from './WeeklyStatisticsModal';
 import type { WorkSession } from '../../types';
 
 export function DashboardPage() {
@@ -46,6 +47,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
 
   const [selectedDetailSession, setSelectedDetailSession] = useState<WorkSession | null>(null);
+  const [isWeeklyStatsModalOpen, setIsWeeklyStatsModalOpen] = useState(false);
 
   const activeProjects = projects?.filter((p) => p.status === 'ACTIVE') || [];
   const activeCount = activeProjects.length;
@@ -233,11 +235,16 @@ export function DashboardPage() {
         </Card>
 
         {/* Weekly Dev Activity */}
-        <Card className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between">
+        <Card
+          onClick={() => setIsWeeklyStatsModalOpen(true)}
+          className="relative overflow-hidden border-zinc-800/90 bg-zinc-900/40 flex flex-col justify-between cursor-pointer hover:border-zinc-700/80 hover:bg-zinc-850/50 transition-all group"
+        >
           <div>
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <span className="text-xs font-medium text-zinc-400">Weekly Dev Activity</span>
+                <span className="text-xs font-medium text-zinc-400 group-hover:text-zinc-300 transition-colors">
+                  Weekly Dev Activity
+                </span>
                 {isWeeklyLoading ? (
                   <Skeleton className="h-8 w-24 mt-1" />
                 ) : (
@@ -246,12 +253,12 @@ export function DashboardPage() {
                   </div>
                 )}
               </div>
-              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:border-emerald-500/40 transition-colors">
                 <TrendingUp className="w-5 h-5" />
               </div>
             </div>
 
-            <div className="mt-2.5 h-[64px] w-full">
+            <div className="mt-2.5 h-[64px] w-full pointer-events-none">
               {isWeeklyLoading ? (
                 <Skeleton className="h-[64px] w-full" />
               ) : (
@@ -492,6 +499,12 @@ export function DashboardPage() {
         isOpen={!!selectedDetailSession}
         onClose={() => setSelectedDetailSession(null)}
         session={selectedDetailSession}
+      />
+
+      {/* Expanded Weekly Statistics Modal */}
+      <WeeklyStatisticsModal
+        isOpen={isWeeklyStatsModalOpen}
+        onClose={() => setIsWeeklyStatsModalOpen(false)}
       />
     </div>
   );

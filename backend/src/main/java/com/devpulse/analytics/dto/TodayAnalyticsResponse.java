@@ -12,3 +12,4 @@ public record TodayAnalyticsResponse(
         long activeSessionTodayWorkingSeconds,
         List<ProjectDurationDto> projects
 ) {}
+

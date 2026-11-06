@@ -9,6 +9,7 @@ public record WeeklyAnalyticsResponse(
         long totalDurationSeconds,
         int activeDays,
         String mostActiveDay,
+        int projectCount,
         UUID activeSessionId,
         long activeSessionWeeklyWorkingSeconds,
         List<DailyActivityDto> dailyActivity

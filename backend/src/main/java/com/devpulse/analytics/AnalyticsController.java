@@ -38,11 +38,13 @@ public class AnalyticsController {
 
     @GetMapping("/dashboard/weekly")
     @Operation(summary = "Get weekly development activity",
-               description = "Computes daily working durations from Monday through Sunday, total weekly time, and active days for the current week")
+               description = "Computes daily working durations from Monday through Sunday, total weekly time, project breakdown, and active days for the specified or current week")
     public ResponseEntity<ApiResponse<WeeklyAnalyticsResponse>> getWeeklyAnalytics(
             @RequestParam(value = "timezone", required = false) String timezone,
+            @RequestParam(value = "weekStart", required = false) String weekStart,
             @AuthenticationPrincipal UserPrincipal principal) {
-        WeeklyAnalyticsResponse response = analyticsService.getWeeklyAnalytics(principal.getId(), timezone);
+        WeeklyAnalyticsResponse response = analyticsService.getWeeklyAnalytics(principal.getId(), timezone, weekStart);
         return ResponseEntity.ok(ApiResponse.success("Weekly analytics retrieved successfully", response));
     }
 }
+

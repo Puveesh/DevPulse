@@ -101,3 +101,4 @@ export const WeeklyActivityChart: React.FC<WeeklyActivityChartProps> = ({
     </div>
   );
 };
+

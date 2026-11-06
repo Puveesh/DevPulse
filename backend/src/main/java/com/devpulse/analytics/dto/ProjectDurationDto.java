@@ -7,3 +7,4 @@ public record ProjectDurationDto(
         String projectName,
         long durationSeconds
 ) {}
+

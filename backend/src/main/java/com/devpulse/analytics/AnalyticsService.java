@@ -128,11 +128,35 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public WeeklyAnalyticsResponse getWeeklyAnalytics(UUID userId, String timezone) {
+        return getWeeklyAnalytics(userId, timezone, null);
+    }
+
+    @Transactional(readOnly = true)
+    public WeeklyAnalyticsResponse getWeeklyAnalytics(UUID userId, String timezone, String weekStartStr) {
         ZoneId zone = resolveZone(timezone);
         Instant now = Instant.now();
         LocalDate todayDate = LocalDate.now(zone);
 
-        LocalDate mondayDate = todayDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate currentWeekMonday = todayDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate mondayDate;
+
+        if (weekStartStr != null && !weekStartStr.isBlank()) {
+            try {
+                LocalDate requestedDate = LocalDate.parse(weekStartStr.trim());
+                LocalDate requestedMonday = requestedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+                // Guard: Do not allow navigation into future weeks
+                if (requestedMonday.isAfter(currentWeekMonday)) {
+                    mondayDate = currentWeekMonday;
+                } else {
+                    mondayDate = requestedMonday;
+                }
+            } catch (Exception e) {
+                mondayDate = currentWeekMonday;
+            }
+        } else {
+            mondayDate = currentWeekMonday;
+        }
+
         LocalDate sundayDate = mondayDate.plusDays(6);
 
         Instant weekStart = mondayDate.atStartOfDay(zone).toInstant();
@@ -149,12 +173,20 @@ public class AnalyticsService {
         Map<UUID, List<SessionPauseInterval>> pausesBySession = allPauses.stream()
                 .collect(Collectors.groupingBy(SessionPauseInterval::getSessionId));
 
-        // 3. Calculate 7 daily buckets (Monday through Sunday)
+        // 3. Resolve project names for all projects touched in the week
+        Set<UUID> allWeekProjectIds = sessions.stream()
+                .map(WorkSession::getProjectId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<UUID, String> projectNames = resolveProjectNames(allWeekProjectIds, userId);
+
+        // 4. Calculate 7 daily buckets (Monday through Sunday)
         List<DailyActivityDto> dailyList = new ArrayList<>(7);
         long totalWeeklySeconds = 0L;
         int activeDays = 0;
         String mostActiveDay = null;
         long maxDaySeconds = 0L;
+        Set<UUID> activeProjectIdsInWeek = new HashSet<>();
 
         for (int i = 0; i < 7; i++) {
             LocalDate currentDay = mondayDate.plusDays(i);
@@ -163,9 +195,11 @@ public class AnalyticsService {
             String dayName = currentDay.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
 
             long dayWorkingSeconds = 0L;
+            Map<UUID, Long> dayProjectDurations = new HashMap<>();
+
             for (WorkSession session : sessions) {
                 List<SessionPauseInterval> pauses = pausesBySession.getOrDefault(session.getId(), List.of());
-                dayWorkingSeconds += calculateWorkingSecondsInWindow(
+                long workingInDay = calculateWorkingSecondsInWindow(
                         session.getStartedAt(),
                         session.getEndedAt(),
                         pauses,
@@ -173,9 +207,26 @@ public class AnalyticsService {
                         dayEnd,
                         now
                 );
+
+                if (workingInDay > 0) {
+                    dayWorkingSeconds += workingInDay;
+                    if (session.getProjectId() != null) {
+                        dayProjectDurations.merge(session.getProjectId(), workingInDay, Long::sum);
+                        activeProjectIdsInWeek.add(session.getProjectId());
+                    }
+                }
             }
 
-            dailyList.add(new DailyActivityDto(currentDay.toString(), dayName, dayWorkingSeconds));
+            List<ProjectDurationDto> dayProjectList = dayProjectDurations.entrySet().stream()
+                    .map(entry -> new ProjectDurationDto(
+                            entry.getKey(),
+                            projectNames.getOrDefault(entry.getKey(), "Unknown Project"),
+                            entry.getValue()
+                    ))
+                    .sorted(Comparator.comparingLong(ProjectDurationDto::durationSeconds).reversed())
+                    .toList();
+
+            dailyList.add(new DailyActivityDto(currentDay.toString(), dayName, dayWorkingSeconds, dayProjectList));
             totalWeeklySeconds += dayWorkingSeconds;
 
             if (dayWorkingSeconds > 0) {
@@ -187,22 +238,26 @@ public class AnalyticsService {
             }
         }
 
-        // Active session tracking across the week
+        // Active session tracking across the week (only if viewing current week)
         UUID activeSessionId = null;
         long activeSessionWeeklyWorkingSeconds = 0L;
-        for (WorkSession session : sessions) {
-            if (session.getStatus() == WorkSessionStatus.ACTIVE && session.getEndedAt() == null) {
-                activeSessionId = session.getId();
-                List<SessionPauseInterval> pauses = pausesBySession.getOrDefault(session.getId(), List.of());
-                activeSessionWeeklyWorkingSeconds = calculateWorkingSecondsInWindow(
-                        session.getStartedAt(),
-                        null,
-                        pauses,
-                        weekStart,
-                        weekEnd,
-                        now
-                );
-                break;
+        boolean isCurrentWeek = mondayDate.equals(currentWeekMonday);
+
+        if (isCurrentWeek) {
+            for (WorkSession session : sessions) {
+                if (session.getStatus() == WorkSessionStatus.ACTIVE && session.getEndedAt() == null) {
+                    activeSessionId = session.getId();
+                    List<SessionPauseInterval> pauses = pausesBySession.getOrDefault(session.getId(), List.of());
+                    activeSessionWeeklyWorkingSeconds = calculateWorkingSecondsInWindow(
+                            session.getStartedAt(),
+                            null,
+                            pauses,
+                            weekStart,
+                            weekEnd,
+                            now
+                    );
+                    break;
+                }
             }
         }
 
@@ -212,6 +267,7 @@ public class AnalyticsService {
                 totalWeeklySeconds,
                 activeDays,
                 mostActiveDay,
+                activeProjectIdsInWeek.size(),
                 activeSessionId,
                 activeSessionWeeklyWorkingSeconds,
                 dailyList
@@ -296,3 +352,4 @@ public class AnalyticsService {
                 .collect(Collectors.toMap(Project::getId, Project::getName));
     }
 }
+

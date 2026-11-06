@@ -29,15 +29,20 @@ export function useTodayAnalytics(customTimezone?: string) {
   });
 }
 
-export function useWeeklyAnalytics(customTimezone?: string) {
+export function useWeeklyAnalytics(customTimezone?: string, weekStart?: string) {
   const token = getAuthToken();
   const tz = customTimezone || getUserTimezone();
 
   return useQuery({
-    queryKey: ['analytics', 'weekly', tz],
+    queryKey: ['analytics', 'weekly', tz, weekStart || 'current'],
     queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('timezone', tz);
+      if (weekStart) {
+        params.set('weekStart', weekStart);
+      }
       const res = await apiClient.get<ApiResponse<WeeklyAnalytics>>(
-        `/analytics/dashboard/weekly?timezone=${encodeURIComponent(tz)}`
+        `/analytics/dashboard/weekly?${params.toString()}`
       );
       return res.data.data;
     },
@@ -47,3 +52,4 @@ export function useWeeklyAnalytics(customTimezone?: string) {
     refetchOnWindowFocus: true,
   });
 }
+

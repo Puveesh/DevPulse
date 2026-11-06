@@ -127,6 +127,7 @@ export interface DailyActivity {
   date: string;
   day: string;
   durationSeconds: number;
+  projects?: ProjectDuration[];
 }
 
 export interface TodayAnalytics {
@@ -145,6 +146,7 @@ export interface WeeklyAnalytics {
   totalDurationSeconds: number;
   activeDays: number;
   mostActiveDay: string | null;
+  projectCount: number;
   activeSessionId: string | null;
   activeSessionWeeklyWorkingSeconds: number;
   dailyActivity: DailyActivity[];

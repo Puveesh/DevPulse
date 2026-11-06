@@ -70,3 +70,4 @@ describe('Analytics Utility & Calculation Tests', () => {
     expect(formatDuration(liveTodayTotal)).toBe('01:01:05');
   });
 });
+

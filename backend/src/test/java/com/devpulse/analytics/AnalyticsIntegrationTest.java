@@ -212,13 +212,64 @@ class AnalyticsIntegrationTest {
                 .andExpect(jsonPath("$.data.totalDurationSeconds", is(21600))) // 7200 + 14400 = 21600 (6 hours)
                 .andExpect(jsonPath("$.data.activeDays", is(2)))
                 .andExpect(jsonPath("$.data.mostActiveDay", is("Tuesday")))
+                .andExpect(jsonPath("$.data.projectCount", is(1)))
                 .andExpect(jsonPath("$.data.dailyActivity", hasSize(7)))
                 .andExpect(jsonPath("$.data.dailyActivity[0].day", is("Monday")))
                 .andExpect(jsonPath("$.data.dailyActivity[0].durationSeconds", is(7200)))
+                .andExpect(jsonPath("$.data.dailyActivity[0].projects", hasSize(1)))
+                .andExpect(jsonPath("$.data.dailyActivity[0].projects[0].projectName", is("Weekly Proj")))
+                .andExpect(jsonPath("$.data.dailyActivity[0].projects[0].durationSeconds", is(7200)))
                 .andExpect(jsonPath("$.data.dailyActivity[1].day", is("Tuesday")))
                 .andExpect(jsonPath("$.data.dailyActivity[1].durationSeconds", is(14400)))
                 .andExpect(jsonPath("$.data.dailyActivity[2].day", is("Wednesday")))
-                .andExpect(jsonPath("$.data.dailyActivity[2].durationSeconds", is(0)));
+                .andExpect(jsonPath("$.data.dailyActivity[2].durationSeconds", is(0)))
+                .andExpect(jsonPath("$.data.dailyActivity[2].projects", hasSize(0)));
+    }
+
+    @Test
+    void testWeeklyAnalyticsMultiProjectBreakdownAndWeekNavigation() throws Exception {
+        String token = registerAndGetToken("multiproject@devpulse.io", "Multi Project User");
+        UUID userId = userRepository.findByEmail("multiproject@devpulse.io").orElseThrow().getId();
+
+        Project projA = projectRepository.save(new Project(userId, "Project A", "Desc A", null, "React", ProjectStatus.ACTIVE));
+        Project projB = projectRepository.save(new Project(userId, "Project B", "Desc B", null, "Spring", ProjectStatus.ACTIVE));
+
+        ZoneId utc = ZoneOffset.UTC;
+        LocalDate todayUtc = LocalDate.now(utc);
+        LocalDate prevMonday = todayUtc.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1);
+        LocalDate prevFriday = prevMonday.plusDays(4);
+
+        // Friday of previous week: 2 hours on Project A, 1 hour on Project B
+        Instant friAStart = prevFriday.atStartOfDay(utc).plusHours(10).toInstant();
+        WorkSession sessionA = new WorkSession(userId, projA.getId(), null, "Feature A", null, friAStart);
+        sessionA.setEndedAt(friAStart.plusSeconds(7200));
+        sessionA.setStatus(WorkSessionStatus.COMPLETED);
+        sessionA.setTotalDurationSeconds(7200L);
+        workSessionRepository.save(sessionA);
+
+        Instant friBStart = prevFriday.atStartOfDay(utc).plusHours(14).toInstant();
+        WorkSession sessionB = new WorkSession(userId, projB.getId(), null, "Feature B", null, friBStart);
+        sessionB.setEndedAt(friBStart.plusSeconds(3600));
+        sessionB.setStatus(WorkSessionStatus.COMPLETED);
+        sessionB.setTotalDurationSeconds(3600L);
+        workSessionRepository.save(sessionB);
+
+        // Query with weekStart = prevMonday
+        mockMvc.perform(get("/api/v1/analytics/dashboard/weekly?timezone=UTC&weekStart=" + prevMonday)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.weekStart", is(prevMonday.toString())))
+                .andExpect(jsonPath("$.data.totalDurationSeconds", is(10800))) // 7200 + 3600 = 10800 (3 hours)
+                .andExpect(jsonPath("$.data.activeDays", is(1)))
+                .andExpect(jsonPath("$.data.mostActiveDay", is("Friday")))
+                .andExpect(jsonPath("$.data.projectCount", is(2)))
+                .andExpect(jsonPath("$.data.dailyActivity[4].day", is("Friday")))
+                .andExpect(jsonPath("$.data.dailyActivity[4].durationSeconds", is(10800)))
+                .andExpect(jsonPath("$.data.dailyActivity[4].projects", hasSize(2)))
+                .andExpect(jsonPath("$.data.dailyActivity[4].projects[0].projectName", is("Project A")))
+                .andExpect(jsonPath("$.data.dailyActivity[4].projects[0].durationSeconds", is(7200)))
+                .andExpect(jsonPath("$.data.dailyActivity[4].projects[1].projectName", is("Project B")))
+                .andExpect(jsonPath("$.data.dailyActivity[4].projects[1].durationSeconds", is(3600)));
     }
 
     @Test
@@ -250,3 +301,4 @@ class AnalyticsIntegrationTest {
                 .andExpect(jsonPath("$.data.sessionCount", is(0)));
     }
 }
+
