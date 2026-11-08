@@ -27,6 +27,7 @@ import { SessionDetailModal } from '../worklog/SessionDetailModal';
 import { WeeklyActivityChart } from './WeeklyActivityChart';
 import { WeeklyStatisticsModal } from './WeeklyStatisticsModal';
 import { TodayWorklogModal } from './TodayWorklogModal';
+import { ProjectTaskOverview } from './ProjectTaskOverview';
 import type { WorkSession } from '../../types';
 
 export function DashboardPage() {
@@ -298,64 +299,69 @@ export function DashboardPage() {
 
       {/* Main Grid: Projects & Work Sessions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Active Projects List */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-zinc-200">Your Active Projects</h2>
-            <Link
-              to="/projects"
-              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium"
-            >
-              View all <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
+        {/* Active Projects List & Project Task Overview */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-zinc-200">Your Active Projects</h2>
+              <Link
+                to="/projects"
+                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium"
+              >
+                View all <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : activeProjects.length > 0 ? (
+              <div className="space-y-3">
+                {activeProjects.slice(0, 4).map((project) => (
+                  <div
+                    key={project.id}
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                    className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4 hover:border-zinc-700/80 hover:bg-zinc-850/50 transition-all cursor-pointer flex items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2.5">
+                        <h4 className="text-sm font-semibold text-zinc-100 truncate">{project.name}</h4>
+                        <Badge status={project.status} />
+                      </div>
+                      {project.description && (
+                        <p className="text-xs text-zinc-400 truncate max-w-lg">{project.description}</p>
+                      )}
+                      {project.techStack && (
+                        <div className="flex items-center gap-1.5 pt-1 text-[11px] text-zinc-500 font-mono">
+                          <Terminal className="w-3 h-3 text-zinc-400 shrink-0" />
+                          <span className="truncate">{project.techStack}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-[11px] text-zinc-500 block font-mono">
+                        Updated {formatDate(project.updatedAt)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState
+                icon={<FolderKanban className="w-6 h-6" />}
+                title="No active projects"
+                description="Create your first development project to start tracking your codebase progress."
+                actionText="Create Project"
+                onAction={() => navigate('/projects?action=create')}
+              />
+            )}
           </div>
 
-          {isLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
-            </div>
-          ) : activeProjects.length > 0 ? (
-            <div className="space-y-3">
-              {activeProjects.slice(0, 4).map((project) => (
-                <div
-                  key={project.id}
-                  onClick={() => navigate(`/projects/${project.id}`)}
-                  className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4 hover:border-zinc-700/80 hover:bg-zinc-850/50 transition-all cursor-pointer flex items-center justify-between gap-4"
-                >
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-2.5">
-                      <h4 className="text-sm font-semibold text-zinc-100 truncate">{project.name}</h4>
-                      <Badge status={project.status} />
-                    </div>
-                    {project.description && (
-                      <p className="text-xs text-zinc-400 truncate max-w-lg">{project.description}</p>
-                    )}
-                    {project.techStack && (
-                      <div className="flex items-center gap-1.5 pt-1 text-[11px] text-zinc-500 font-mono">
-                        <Terminal className="w-3 h-3 text-zinc-400 shrink-0" />
-                        <span className="truncate">{project.techStack}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="text-[11px] text-zinc-500 block font-mono">
-                      Updated {formatDate(project.updatedAt)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              icon={<FolderKanban className="w-6 h-6" />}
-              title="No active projects"
-              description="Create your first development project to start tracking your codebase progress."
-              actionText="Create Project"
-              onAction={() => navigate('/projects?action=create')}
-            />
-          )}
+          {/* Project Task Overview directly below Active Projects */}
+          <ProjectTaskOverview />
         </div>
 
         {/* Quick Action & Worklog area */}

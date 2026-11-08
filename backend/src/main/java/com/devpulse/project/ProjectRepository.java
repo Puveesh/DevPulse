@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +15,8 @@ import java.util.UUID;
 public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     Optional<Project> findByIdAndUserId(UUID id, UUID userId);
+
+    List<Project> findByUserIdOrderByUpdatedAtDesc(UUID userId);
 
     Page<Project> findByUserId(UUID userId, Pageable pageable);
 

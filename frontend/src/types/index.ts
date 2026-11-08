@@ -167,4 +167,47 @@ export interface WeeklyAnalytics {
   dailyActivity: DailyActivity[];
 }
 
+export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface Task {
+  id: string;
+  userId: string;
+  projectId: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  dueDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTaskPayload {
+  title: string;
+  description?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  dueDate?: string | null;
+}
+
+export interface UpdateTaskPayload {
+  title?: string;
+  description?: string;
+  status?: TaskStatus;
+  priority?: TaskPriority;
+  dueDate?: string | null;
+}
+
+export interface ProjectTaskSummaryItem {
+  projectId: string;
+  projectName: string;
+  pendingTaskCount: number;
+}
+
+export interface ProjectTaskSummaryResponse {
+  projects: ProjectTaskSummaryItem[];
+}
+
+
 
