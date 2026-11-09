@@ -5,3 +5,4 @@ import java.util.List;
 public record ProjectTaskSummaryResponse(
         List<ProjectTaskSummaryDto> projects
 ) {}
+

@@ -52,3 +52,4 @@ describe('Task Management Logic & Formatting Tests', () => {
     expect(summary[2].pendingTaskCount).toBe(0);
   });
 });
+

@@ -215,3 +215,4 @@ class TaskIntegrationTest {
                 .andExpect(jsonPath("$.data.projects[?(@.projectName == 'Weather App')].pendingTaskCount").value(0));
     }
 }
+

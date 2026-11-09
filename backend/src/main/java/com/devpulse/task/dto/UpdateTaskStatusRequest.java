@@ -7,3 +7,4 @@ public record UpdateTaskStatusRequest(
         @NotNull(message = "Task status is required")
         TaskStatus status
 ) {}
+

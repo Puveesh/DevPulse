@@ -7,3 +7,4 @@ public record ProjectTaskSummaryDto(
         String projectName,
         long pendingTaskCount
 ) {}
+
