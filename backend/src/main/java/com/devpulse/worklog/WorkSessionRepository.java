@@ -24,6 +24,8 @@ public interface WorkSessionRepository extends JpaRepository<WorkSession, UUID> 
 
     Page<WorkSession> findByProjectIdAndUserIdOrderByStartedAtDesc(UUID projectId, UUID userId, Pageable pageable);
 
+    Optional<WorkSession> findFirstByProjectIdAndUserIdOrderByStartedAtDesc(UUID projectId, UUID userId);
+
     List<WorkSession> findTop10ByUserIdOrderByStartedAtDesc(UUID userId);
 
     @org.springframework.data.jpa.repository.Query("SELECT s FROM WorkSession s WHERE s.userId = :userId AND s.startedAt < :windowEnd AND (s.endedAt IS NULL OR s.endedAt >= :windowStart)")

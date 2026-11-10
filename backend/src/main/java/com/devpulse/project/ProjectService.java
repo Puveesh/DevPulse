@@ -47,19 +47,23 @@ public class ProjectService {
         String trimmedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
         Page<Project> projects = projectRepository.findByUserIdWithFilters(userId, status, trimmedSearch, pageable);
 
-        List<Object[]> activities = workSessionRepository.findLatestActivityByUserIdGroupByProjectId(userId);
-        Map<UUID, Instant> lastActivityMap = activities.stream()
-                .filter(row -> row[0] != null && row[1] != null)
-                .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Instant) row[1]));
-
-        return projects.map(p -> ProjectResponse.fromProject(p, lastActivityMap.get(p.getId())));
+        return projects.map(p -> {
+            Instant lastActivity = workSessionRepository
+                    .findFirstByProjectIdAndUserIdOrderByStartedAtDesc(p.getId(), userId)
+                    .map(s -> s.getEndedAt() != null ? s.getEndedAt() : s.getStartedAt())
+                    .orElse(null);
+            return ProjectResponse.fromProject(p, lastActivity);
+        });
     }
 
     @Transactional(readOnly = true)
     public ProjectResponse getProjectById(UUID id, UUID userId) {
         Project project = projectRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
-        Instant lastActivity = workSessionRepository.findLatestActivityByProjectId(userId, id).orElse(null);
+        Instant lastActivity = workSessionRepository
+                .findFirstByProjectIdAndUserIdOrderByStartedAtDesc(id, userId)
+                .map(s -> s.getEndedAt() != null ? s.getEndedAt() : s.getStartedAt())
+                .orElse(null);
         return ProjectResponse.fromProject(project, lastActivity);
     }
 
@@ -85,7 +89,10 @@ public class ProjectService {
         }
 
         Project updatedProject = projectRepository.save(project);
-        Instant lastActivity = workSessionRepository.findLatestActivityByProjectId(userId, id).orElse(null);
+        Instant lastActivity = workSessionRepository
+                .findFirstByProjectIdAndUserIdOrderByStartedAtDesc(id, userId)
+                .map(s -> s.getEndedAt() != null ? s.getEndedAt() : s.getStartedAt())
+                .orElse(null);
         return ProjectResponse.fromProject(updatedProject, lastActivity);
     }
 
