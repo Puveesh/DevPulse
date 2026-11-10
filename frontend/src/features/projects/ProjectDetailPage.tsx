@@ -78,17 +78,20 @@ export function ProjectDetailPage() {
   const {
     activeSession,
     elapsedSeconds,
+    openStartModal,
+    openEndModal,
     pauseSession,
     resumeSession,
-    openEndModal,
     isPausing,
     isResuming,
     isSessionActiveForProject,
     isSessionPausedForProject,
+    isAnotherProjectActive,
   } = useWorkSessionContext();
 
   const isCurrentActive = project ? isSessionActiveForProject(project.id) : false;
   const isCurrentPaused = project ? isSessionPausedForProject(project.id) : false;
+  const isAnotherActive = project ? isAnotherProjectActive(project.id) : false;
 
   const pendingTasksCount = (tasks || []).filter(
     (t) => t.status === 'TODO' || t.status === 'IN_PROGRESS'
@@ -234,6 +237,34 @@ export function ProjectDetailPage() {
                   >
                     <Square className="w-3 h-3 fill-current" />
                     <span>Stop</span>
+                  </button>
+                </div>
+              )}
+
+              {/* When no active/paused session for this project, show Start button */}
+              {!isCurrentActive && !isCurrentPaused && (
+                <div className="flex items-center gap-2 pl-2 border-l border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isAnotherActive) {
+                        openStartModal(project.id);
+                      }
+                    }}
+                    disabled={isAnotherActive}
+                    title={
+                      isAnotherActive
+                        ? `Another session (${activeSession?.projectName || 'Project'}) is active. Pause or stop it first.`
+                        : 'Start development session for this project'
+                    }
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      isAnotherActive
+                        ? 'bg-zinc-850 text-zinc-500 border border-zinc-800 cursor-not-allowed opacity-60'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer shadow-xs'
+                    }`}
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>Start Timer</span>
                   </button>
                 </div>
               )}

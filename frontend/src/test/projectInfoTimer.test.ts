@@ -69,4 +69,33 @@ describe('Project Info Synchronized Timer Tests', () => {
     expect(timeTicking(elapsedSeconds, isPaused)).toBe(5075);
     expect(formatDuration(timeTicking(elapsedSeconds, isPaused))).toBe('01:24:35');
   });
+
+  it('shows Start button when no session is active/paused for this project, and respects another active session', () => {
+    // Case 1: No active session anywhere
+    let activeSession: Partial<WorkSession> | null = null;
+    let hasActiveOrPausedSession = false;
+
+    let isSessionActiveForProject = (pid: string) =>
+      !!activeSession && activeSession.status === 'ACTIVE' && activeSession.projectId === pid;
+    let isSessionPausedForProject = (pid: string) =>
+      !!activeSession && activeSession.status === 'PAUSED' && activeSession.projectId === pid;
+    let isAnotherProjectActive = (pid: string) =>
+      hasActiveOrPausedSession && activeSession?.projectId !== pid;
+
+    // Both projects show Start button and both are enabled
+    expect(!isSessionActiveForProject(projectA.id) && !isSessionPausedForProject(projectA.id)).toBe(true);
+    expect(isAnotherProjectActive(projectA.id)).toBe(false);
+
+    // Case 2: Project A is active
+    activeSession = { id: 's1', projectId: projectA.id, status: 'ACTIVE' };
+    hasActiveOrPausedSession = true;
+
+    // Project A shows running timer controls, not Start button
+    expect(!isSessionActiveForProject(projectA.id) && !isSessionPausedForProject(projectA.id)).toBe(false);
+
+    // Project B shows Start button, but it is disabled because Project A is active
+    expect(!isSessionActiveForProject(projectB.id) && !isSessionPausedForProject(projectB.id)).toBe(true);
+    expect(isAnotherProjectActive(projectB.id)).toBe(true);
+  });
 });
+
