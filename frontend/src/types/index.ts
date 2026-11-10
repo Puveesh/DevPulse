@@ -47,6 +47,7 @@ export interface Project {
   status: ProjectStatus;
   createdAt: string;
   updatedAt: string;
+  lastActivity?: string | null;
 }
 
 export interface CreateProjectPayload {

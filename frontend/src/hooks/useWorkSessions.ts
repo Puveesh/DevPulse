@@ -28,13 +28,20 @@ export function useActiveSession() {
   });
 }
 
-export function useWorkSessions(page = 0, size = 20) {
+export function useWorkSessions(page = 0, size = 20, projectId?: string) {
   return useQuery({
-    queryKey: ['work-sessions', 'list', page, size],
+    queryKey: ['work-sessions', 'list', page, size, projectId || 'all'],
     queryFn: async () => {
       try {
+        const params = new URLSearchParams({
+          page: String(page),
+          size: String(size),
+        });
+        if (projectId) {
+          params.append('projectId', projectId);
+        }
         const res = await apiClient.get<ApiResponse<PageResponse<WorkSession> | WorkSession[]>>(
-          `/work-sessions?page=${page}&size=${size}`
+          `/work-sessions?${params.toString()}`
         );
         const data = res.data.data;
         if (Array.isArray(data)) {
@@ -82,6 +89,7 @@ export function useStartSession() {
         queryClient.setQueryData(['work-sessions', 'active'], data);
       }
       queryClient.invalidateQueries({ queryKey: ['work-sessions', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
   });
@@ -105,6 +113,7 @@ export function usePauseSession() {
         queryClient.setQueryData(['work-sessions', 'active'], data);
       }
       queryClient.invalidateQueries({ queryKey: ['work-sessions', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
     onError: () => {
@@ -132,6 +141,7 @@ export function useResumeSession() {
         queryClient.setQueryData(['work-sessions', 'active'], data);
       }
       queryClient.invalidateQueries({ queryKey: ['work-sessions', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
     onError: () => {
@@ -155,6 +165,7 @@ export function useEndSession() {
         if (message.toLowerCase().includes('already completed')) {
           queryClient.setQueryData(['work-sessions', 'active'], null);
           queryClient.invalidateQueries({ queryKey: ['work-sessions'] });
+          queryClient.invalidateQueries({ queryKey: ['projects'] });
           queryClient.invalidateQueries({ queryKey: ['analytics'] });
           return null as unknown as WorkSession;
         }
@@ -165,6 +176,7 @@ export function useEndSession() {
       // Immediately clear active session so timer and card indicators disappear without delay
       queryClient.setQueryData(['work-sessions', 'active'], null);
       queryClient.invalidateQueries({ queryKey: ['work-sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
     onError: () => {

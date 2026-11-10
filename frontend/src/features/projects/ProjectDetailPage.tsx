@@ -3,9 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useProject } from '../../hooks/useProjects';
 import { useProjectTasks, useUpdateTaskStatus } from '../../hooks/useTasks';
 import { useWorkSessionContext } from '../../contexts/WorkSessionContext';
+import { useWorkSessions } from '../../hooks/useWorkSessions';
 import { ProjectModal } from './ProjectModal';
 import { DeleteProjectDialog } from './DeleteProjectDialog';
 import { TaskModal } from '../tasks/TaskModal';
+import { SessionDetailModal } from '../worklog/SessionDetailModal';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Card } from '../../components/ui/Card';
@@ -28,8 +30,8 @@ import {
   Play,
   Square,
 } from 'lucide-react';
-import { formatDate, formatDuration } from '../../lib/utils';
-import type { TaskStatus } from '../../types';
+import { formatDate, formatTime, formatDuration } from '../../lib/utils';
+import type { TaskStatus, WorkSession } from '../../types';
 
 function TaskPriorityBadge({ priority }: { priority: string }) {
   switch (priority) {
@@ -68,11 +70,13 @@ export function ProjectDetailPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<WorkSession | null>(null);
   const [taskSuccessMsg, setTaskSuccessMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'sessions' | 'notes' | 'attachments'>('tasks');
 
   const { data: project, isLoading, isError, error } = useProject(id);
   const { data: tasks, isLoading: isTasksLoading } = useProjectTasks(id);
+  const { data: sessionsData, isLoading: isSessionsLoading } = useWorkSessions(0, 50, id);
   const updateTaskStatusMutation = useUpdateTaskStatus(id || '');
 
   const {
@@ -196,7 +200,11 @@ export function ProjectDetailPage() {
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-zinc-500" />
-              <span>Last activity {formatDate(project.updatedAt)}</span>
+              <span>
+                {project.lastActivity
+                  ? `Last activity ${formatDate(project.lastActivity)}`
+                  : 'No activity yet'}
+              </span>
             </div>
           </div>
 
@@ -340,6 +348,11 @@ export function ProjectDetailPage() {
           >
             <Clock className="w-3.5 h-3.5" />
             <span>Work Sessions</span>
+            {sessionsData && sessionsData.totalElements > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-300">
+                {sessionsData.totalElements}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('notes')}
@@ -440,10 +453,10 @@ export function ProjectDetailPage() {
                             disabled={updateTaskStatusMutation.isPending}
                             className="px-2.5 py-1 text-xs rounded-lg border border-zinc-700/80 bg-zinc-850 text-zinc-200 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
                           >
-                            <option value="TODO">To Do</option>
-                            <option value="IN_PROGRESS">In Progress</option>
-                            <option value="COMPLETED">Completed</option>
-                            <option value="CANCELLED">Cancelled</option>
+                            <option value="TODO" className="text-zinc-900 bg-white" style={{ color: '#09090b', backgroundColor: '#ffffff' }}>To Do</option>
+                            <option value="IN_PROGRESS" className="text-zinc-900 bg-white" style={{ color: '#09090b', backgroundColor: '#ffffff' }}>In Progress</option>
+                            <option value="COMPLETED" className="text-zinc-900 bg-white" style={{ color: '#09090b', backgroundColor: '#ffffff' }}>Completed</option>
+                            <option value="CANCELLED" className="text-zinc-900 bg-white" style={{ color: '#09090b', backgroundColor: '#ffffff' }}>Cancelled</option>
                           </select>
                         </div>
                       </div>
@@ -475,11 +488,115 @@ export function ProjectDetailPage() {
         )}
 
         {activeTab === 'sessions' && (
-          <EmptyState
-            icon={<Clock className="w-6 h-6" />}
-            title="No work sessions recorded"
-            description="Work session logging with timer state validation is prepared at the schema layer."
-          />
+          isSessionsLoading ? (
+            <div className="space-y-3 py-2">
+              <Skeleton className="h-16 w-full rounded-xl" />
+              <Skeleton className="h-16 w-full rounded-xl" />
+            </div>
+          ) : !sessionsData || sessionsData.content.length === 0 ? (
+            <EmptyState
+              icon={<Clock className="w-8 h-8 text-blue-400" />}
+              title="No work sessions recorded for this project yet."
+              description="Start a development session to track your time and progress on this project."
+              actionText="Start Dev Session"
+              onAction={() => {
+                if (!isAnotherActive) {
+                  openStartModal(project.id);
+                }
+              }}
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border border-zinc-800 bg-zinc-900/40">
+                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                  <Clock className="w-4 h-4 text-blue-400" />
+                  <span>
+                    <strong className="text-zinc-200">{sessionsData.totalElements}</strong>{' '}
+                    {sessionsData.totalElements === 1 ? 'session' : 'sessions'} recorded
+                  </span>
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="primary"
+                  leftIcon={<Play className="w-3.5 h-3.5 fill-current" />}
+                  disabled={isAnotherActive}
+                  onClick={() => {
+                    if (!isAnotherActive) {
+                      openStartModal(project.id);
+                    }
+                  }}
+                >
+                  Start Dev Session
+                </Button>
+              </div>
+
+              <div className="divide-y divide-zinc-800/80 rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4">
+                {sessionsData.content.map((session) => {
+                  const isActive = session.status === 'ACTIVE';
+                  const isPaused = session.status === 'PAUSED';
+                  const duration = (isActive || isPaused) && isCurrentActive && activeSession?.id === session.id
+                    ? elapsedSeconds
+                    : session.totalDurationSeconds || 0;
+
+                  return (
+                    <div
+                      key={session.id}
+                      onClick={() => setSelectedSession(session)}
+                      className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-zinc-800/40 p-2.5 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-zinc-100 truncate">{session.title}</span>
+                          <span
+                            className={`text-[10px] uppercase font-mono px-2 py-0.5 rounded border ${
+                              session.status === 'ACTIVE'
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                                : session.status === 'PAUSED'
+                                ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                                : 'border-zinc-700 bg-zinc-800 text-zinc-300'
+                            }`}
+                          >
+                            {session.status}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-zinc-400">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+                            {formatDate(session.startedAt)}
+                          </span>
+                          <span>
+                            {formatTime(session.startedAt)} &rarr; {session.endedAt ? formatTime(session.endedAt) : (session.status === 'ACTIVE' ? 'In progress' : 'Paused')}
+                          </span>
+                        </div>
+
+                        {session.initialNotes && (
+                          <p className="text-xs text-zinc-400 flex items-start gap-1.5 italic">
+                            <span className="text-zinc-500 not-italic">Initial:</span>
+                            <span>{session.initialNotes}</span>
+                          </p>
+                        )}
+
+                        {session.sessionNotes && (
+                          <p className="text-xs text-zinc-300 flex items-start gap-1.5">
+                            <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-400" />
+                            <span className="line-clamp-2">{session.sessionNotes}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-sm font-bold font-mono text-zinc-200 block">
+                          {formatDuration(duration)}
+                        </span>
+                        <span className="text-[10px] text-blue-400 hover:underline">View & Edit Notes</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )
         )}
 
         {activeTab === 'notes' && (
@@ -529,6 +646,13 @@ export function ProjectDetailPage() {
           }}
         />
       )}
+
+      {/* Session Detail Modal */}
+      <SessionDetailModal
+        isOpen={!!selectedSession}
+        onClose={() => setSelectedSession(null)}
+        session={selectedSession}
+      />
     </div>
   );
 }

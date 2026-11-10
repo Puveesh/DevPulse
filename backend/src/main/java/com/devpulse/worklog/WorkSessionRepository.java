@@ -32,4 +32,15 @@ public interface WorkSessionRepository extends JpaRepository<WorkSession, UUID> 
             @org.springframework.data.repository.query.Param("windowStart") java.time.Instant windowStart,
             @org.springframework.data.repository.query.Param("windowEnd") java.time.Instant windowEnd
     );
+
+    @org.springframework.data.jpa.repository.Query("SELECT MAX(COALESCE(w.endedAt, w.startedAt)) FROM WorkSession w WHERE w.userId = :userId AND w.projectId = :projectId")
+    Optional<java.time.Instant> findLatestActivityByProjectId(
+            @org.springframework.data.repository.query.Param("userId") UUID userId,
+            @org.springframework.data.repository.query.Param("projectId") UUID projectId
+    );
+
+    @org.springframework.data.jpa.repository.Query("SELECT w.projectId, MAX(COALESCE(w.endedAt, w.startedAt)) FROM WorkSession w WHERE w.userId = :userId GROUP BY w.projectId")
+    List<Object[]> findLatestActivityByUserIdGroupByProjectId(
+            @org.springframework.data.repository.query.Param("userId") UUID userId
+    );
 }

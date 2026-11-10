@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -105,11 +106,12 @@ public class WorkSessionController {
     }
 
     @GetMapping
-    @Operation(summary = "List work sessions", description = "Retrieves paginated work sessions for the user")
+    @Operation(summary = "List work sessions", description = "Retrieves paginated work sessions for the user, optionally filtered by project")
     public ResponseEntity<ApiResponse<Page<WorkSessionResponse>>> getSessions(
+            @RequestParam(required = false) UUID projectId,
             @PageableDefault(size = 20, sort = "startedAt", direction = Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal UserPrincipal principal) {
-        Page<WorkSessionResponse> sessions = workSessionService.getSessions(principal.getId(), pageable);
+        Page<WorkSessionResponse> sessions = workSessionService.getSessions(principal.getId(), projectId, pageable);
         return ResponseEntity.ok(ApiResponse.success("Work sessions retrieved successfully", sessions));
     }
 }

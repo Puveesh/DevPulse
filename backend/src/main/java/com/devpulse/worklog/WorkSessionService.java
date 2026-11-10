@@ -237,7 +237,20 @@ public class WorkSessionService {
 
     @Transactional(readOnly = true)
     public Page<WorkSessionResponse> getSessions(UUID userId, Pageable pageable) {
-        Page<WorkSession> page = workSessionRepository.findByUserIdOrderByStartedAtDesc(userId, pageable);
+        return getSessions(userId, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WorkSessionResponse> getSessions(UUID userId, UUID projectId, Pageable pageable) {
+        Page<WorkSession> page;
+        if (projectId != null) {
+            projectRepository.findByIdAndUserId(projectId, userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + projectId));
+            page = workSessionRepository.findByProjectIdAndUserIdOrderByStartedAtDesc(projectId, userId, pageable);
+        } else {
+            page = workSessionRepository.findByUserIdOrderByStartedAtDesc(userId, pageable);
+        }
+
         Map<UUID, String> projectNames = fetchProjectNames(page.getContent(), userId);
 
         return page.map(s -> {

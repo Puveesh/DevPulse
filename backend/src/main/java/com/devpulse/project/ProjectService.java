@@ -4,20 +4,27 @@ import com.devpulse.common.ResourceNotFoundException;
 import com.devpulse.project.dto.CreateProjectRequest;
 import com.devpulse.project.dto.ProjectResponse;
 import com.devpulse.project.dto.UpdateProjectRequest;
+import com.devpulse.worklog.WorkSessionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ProjectService {
 
     private final ProjectRepository projectRepository;
+    private final WorkSessionRepository workSessionRepository;
 
-    public ProjectService(ProjectRepository projectRepository) {
+    public ProjectService(ProjectRepository projectRepository, WorkSessionRepository workSessionRepository) {
         this.projectRepository = projectRepository;
+        this.workSessionRepository = workSessionRepository;
     }
 
     @Transactional
@@ -32,21 +39,28 @@ public class ProjectService {
         );
 
         Project savedProject = projectRepository.save(project);
-        return ProjectResponse.fromProject(savedProject);
+        return ProjectResponse.fromProject(savedProject, null);
     }
 
     @Transactional(readOnly = true)
     public Page<ProjectResponse> getProjects(UUID userId, ProjectStatus status, String search, Pageable pageable) {
         String trimmedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        return projectRepository.findByUserIdWithFilters(userId, status, trimmedSearch, pageable)
-                .map(ProjectResponse::fromProject);
+        Page<Project> projects = projectRepository.findByUserIdWithFilters(userId, status, trimmedSearch, pageable);
+
+        List<Object[]> activities = workSessionRepository.findLatestActivityByUserIdGroupByProjectId(userId);
+        Map<UUID, Instant> lastActivityMap = activities.stream()
+                .filter(row -> row[0] != null && row[1] != null)
+                .collect(Collectors.toMap(row -> (UUID) row[0], row -> (Instant) row[1]));
+
+        return projects.map(p -> ProjectResponse.fromProject(p, lastActivityMap.get(p.getId())));
     }
 
     @Transactional(readOnly = true)
     public ProjectResponse getProjectById(UUID id, UUID userId) {
         Project project = projectRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
-        return ProjectResponse.fromProject(project);
+        Instant lastActivity = workSessionRepository.findLatestActivityByProjectId(userId, id).orElse(null);
+        return ProjectResponse.fromProject(project, lastActivity);
     }
 
     @Transactional
@@ -71,7 +85,8 @@ public class ProjectService {
         }
 
         Project updatedProject = projectRepository.save(project);
-        return ProjectResponse.fromProject(updatedProject);
+        Instant lastActivity = workSessionRepository.findLatestActivityByProjectId(userId, id).orElse(null);
+        return ProjectResponse.fromProject(updatedProject, lastActivity);
     }
 
     @Transactional

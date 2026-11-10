@@ -349,4 +349,119 @@ class WorkSessionIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status", is("ACTIVE")));
     }
+
+    @Test
+    void testProjectSpecificWorkSessionFilteringAndSecurityIsolation() throws Exception {
+        String tokenUser1 = registerAndGetToken("user1-filter@devpulse.io", "User 1");
+        String tokenUser2 = registerAndGetToken("user2-filter@devpulse.io", "User 2");
+        UUID user1Id = userRepository.findByEmail("user1-filter@devpulse.io").orElseThrow().getId();
+
+        Project projA = projectRepository.save(new Project(user1Id, "Project Alpha", null, null, "Java", ProjectStatus.ACTIVE));
+        Project projB = projectRepository.save(new Project(user1Id, "Project Beta", null, null, "Go", ProjectStatus.ACTIVE));
+
+        // Create 2 sessions on Project A and 1 session on Project B
+        StartWorkSessionRequest reqA1 = new StartWorkSessionRequest(projA.getId(), null, "Alpha Task 1", null);
+        MvcResult resA1 = mockMvc.perform(post("/api/v1/work-sessions/start")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(reqA1))).andExpect(status().isCreated()).andReturn();
+        UUID sessA1Id = objectMapper.readValue(resA1.getResponse().getContentAsString(), new TypeReference<ApiResponse<WorkSessionResponse>>() {}).data().id();
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessA1Id + "/end").header("Authorization", "Bearer " + tokenUser1)).andExpect(status().isOk());
+
+        StartWorkSessionRequest reqB1 = new StartWorkSessionRequest(projB.getId(), null, "Beta Task 1", null);
+        MvcResult resB1 = mockMvc.perform(post("/api/v1/work-sessions/start")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(reqB1))).andExpect(status().isCreated()).andReturn();
+        UUID sessB1Id = objectMapper.readValue(resB1.getResponse().getContentAsString(), new TypeReference<ApiResponse<WorkSessionResponse>>() {}).data().id();
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessB1Id + "/end").header("Authorization", "Bearer " + tokenUser1)).andExpect(status().isOk());
+
+        StartWorkSessionRequest reqA2 = new StartWorkSessionRequest(projA.getId(), null, "Alpha Task 2", null);
+        MvcResult resA2 = mockMvc.perform(post("/api/v1/work-sessions/start")
+                .header("Authorization", "Bearer " + tokenUser1)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(reqA2))).andExpect(status().isCreated()).andReturn();
+        UUID sessA2Id = objectMapper.readValue(resA2.getResponse().getContentAsString(), new TypeReference<ApiResponse<WorkSessionResponse>>() {}).data().id();
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessA2Id + "/end").header("Authorization", "Bearer " + tokenUser1)).andExpect(status().isOk());
+
+        // 1. Filter by Project A -> exactly 2 sessions
+        mockMvc.perform(get("/api/v1/work-sessions?projectId=" + projA.getId())
+                .header("Authorization", "Bearer " + tokenUser1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(2)))
+                .andExpect(jsonPath("$.data.content[0].projectName", is("Project Alpha")))
+                .andExpect(jsonPath("$.data.content[1].projectName", is("Project Alpha")));
+
+        // 2. Filter by Project B -> exactly 1 session
+        mockMvc.perform(get("/api/v1/work-sessions?projectId=" + projB.getId())
+                .header("Authorization", "Bearer " + tokenUser1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].projectName", is("Project Beta")));
+
+        // 3. Standalone query without projectId -> returns all 3 sessions
+        mockMvc.perform(get("/api/v1/work-sessions")
+                .header("Authorization", "Bearer " + tokenUser1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(3)));
+
+        // 4. Security isolation: User 2 tries to filter sessions by User 1's Project A -> 404 Not Found
+        mockMvc.perform(get("/api/v1/work-sessions?projectId=" + projA.getId())
+                .header("Authorization", "Bearer " + tokenUser2))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success", is(false)));
+    }
+
+    @Test
+    void testProjectLastActivityLifecycle() throws Exception {
+        String token = registerAndGetToken("activity-check@devpulse.io", "Activity User");
+        UUID userId = userRepository.findByEmail("activity-check@devpulse.io").orElseThrow().getId();
+
+        Project projDev = projectRepository.save(new Project(userId, "DevPulse", null, null, "Java", ProjectStatus.ACTIVE));
+        Project projOther = projectRepository.save(new Project(userId, "Weather Monitor", null, null, "Python", ProjectStatus.ACTIVE));
+
+        // 1. Initially with zero sessions: lastActivity is null
+        mockMvc.perform(get("/api/v1/projects/" + projDev.getId())
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name", is("DevPulse")))
+                .andExpect(jsonPath("$.data.lastActivity").doesNotExist());
+
+        // 2. Start session on DevPulse -> lastActivity reflects startedAt
+        StartWorkSessionRequest startReq = new StartWorkSessionRequest(projDev.getId(), null, "Session 1", null);
+        MvcResult startRes = mockMvc.perform(post("/api/v1/work-sessions/start")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(startReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        ApiResponse<WorkSessionResponse> startData = objectMapper.readValue(startRes.getResponse().getContentAsString(), new TypeReference<>() {});
+        UUID sessionId = startData.data().id();
+
+        mockMvc.perform(get("/api/v1/projects/" + projDev.getId())
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.lastActivity", notNullValue()));
+
+        // 3. End session with specific endedAt -> lastActivity updates to endedAt
+        Instant endInstant = Instant.now().plusSeconds(60);
+        EndWorkSessionRequest endReq = new EndWorkSessionRequest("Completed session 1", endInstant);
+        mockMvc.perform(post("/api/v1/work-sessions/" + sessionId + "/end")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(endReq)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/projects/" + projDev.getId())
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.lastActivity", notNullValue()));
+
+        // 4. Weather Monitor still has zero sessions -> lastActivity remains null!
+        mockMvc.perform(get("/api/v1/projects/" + projOther.getId())
+                .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name", is("Weather Monitor")))
+                .andExpect(jsonPath("$.data.lastActivity").doesNotExist());
+    }
 }
