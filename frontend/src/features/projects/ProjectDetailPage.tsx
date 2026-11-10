@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useProject } from '../../hooks/useProjects';
 import { useProjectTasks, useUpdateTaskStatus } from '../../hooks/useTasks';
+import { useWorkSessionContext } from '../../contexts/WorkSessionContext';
 import { ProjectModal } from './ProjectModal';
 import { DeleteProjectDialog } from './DeleteProjectDialog';
 import { TaskModal } from '../tasks/TaskModal';
@@ -23,8 +24,11 @@ import {
   FileText,
   Paperclip,
   Plus,
+  Pause,
+  Play,
+  Square,
 } from 'lucide-react';
-import { formatDate } from '../../lib/utils';
+import { formatDate, formatDuration } from '../../lib/utils';
 import type { TaskStatus } from '../../types';
 
 function TaskPriorityBadge({ priority }: { priority: string }) {
@@ -70,6 +74,21 @@ export function ProjectDetailPage() {
   const { data: project, isLoading, isError, error } = useProject(id);
   const { data: tasks, isLoading: isTasksLoading } = useProjectTasks(id);
   const updateTaskStatusMutation = useUpdateTaskStatus(id || '');
+
+  const {
+    activeSession,
+    elapsedSeconds,
+    pauseSession,
+    resumeSession,
+    openEndModal,
+    isPausing,
+    isResuming,
+    isSessionActiveForProject,
+    isSessionPausedForProject,
+  } = useWorkSessionContext();
+
+  const isCurrentActive = project ? isSessionActiveForProject(project.id) : false;
+  const isCurrentPaused = project ? isSessionPausedForProject(project.id) : false;
 
   const pendingTasksCount = (tasks || []).filter(
     (t) => t.status === 'TODO' || t.status === 'IN_PROGRESS'
@@ -134,9 +153,90 @@ export function ProjectDetailPage() {
       <Card className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div className="space-y-2">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight text-white">{project.name}</h1>
               <Badge status={project.status} />
+
+              {isCurrentActive && (
+                <div className="flex items-center gap-2 pl-2 border-l border-zinc-800">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="font-mono font-bold text-zinc-100">
+                      {formatDuration(elapsedSeconds)}
+                    </span>
+                    <span className="text-[11px] text-emerald-400 font-medium hidden sm:inline">
+                      Session in progress
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isPausing && activeSession) pauseSession(activeSession.id);
+                    }}
+                    disabled={isPausing}
+                    title="Pause session"
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-800 text-zinc-300 transition-colors ${
+                      isPausing ? 'opacity-60 cursor-not-allowed' : 'hover:text-white hover:bg-zinc-700 cursor-pointer'
+                    }`}
+                  >
+                    <Pause className="w-3 h-3 text-amber-400" />
+                    <span>{isPausing ? 'Pausing...' : 'Pause'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openEndModal}
+                    title="End session"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-red-950/50 text-red-400 hover:bg-red-900/60 border border-red-800/40 transition-colors cursor-pointer"
+                  >
+                    <Square className="w-3 h-3 fill-current" />
+                    <span>Stop</span>
+                  </button>
+                </div>
+              )}
+
+              {isCurrentPaused && (
+                <div className="flex items-center gap-2 pl-2 border-l border-zinc-800">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs">
+                    <span className="h-2 w-2 rounded-full bg-amber-400"></span>
+                    <span className="font-mono font-bold text-zinc-100">
+                      {formatDuration(elapsedSeconds)}
+                    </span>
+                    <span className="text-[11px] text-amber-400 font-medium hidden sm:inline">
+                      Paused
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isResuming && activeSession) resumeSession(activeSession.id);
+                    }}
+                    disabled={isResuming}
+                    title="Resume session"
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-950/50 text-emerald-400 border border-emerald-800/40 transition-colors ${
+                      isResuming ? 'opacity-60 cursor-not-allowed' : 'hover:bg-emerald-900/60 cursor-pointer'
+                    }`}
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>{isResuming ? 'Resuming...' : 'Resume'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openEndModal}
+                    title="End session"
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-red-950/50 text-red-400 hover:bg-red-900/60 border border-red-800/40 transition-colors cursor-pointer"
+                  >
+                    <Square className="w-3 h-3 fill-current" />
+                    <span>Stop</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <p className="text-xs text-zinc-300 max-w-2xl leading-relaxed">
