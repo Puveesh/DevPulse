@@ -400,7 +400,7 @@ export function ProjectDetailPage() {
               </span>
             )}
           </button>
-          <button
+          {/* <button
             onClick={() => handleTabChange('attachments')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === 'attachments'
@@ -410,7 +410,7 @@ export function ProjectDetailPage() {
           >
             <Paperclip className="w-3.5 h-3.5" />
             <span>Attachments</span>
-          </button>
+          </button> */}
         </div>
 
         {/* Tab Contents */}

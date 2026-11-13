@@ -84,3 +84,4 @@ describe('Delete Project Dialog Acknowledgement Checkboxes', () => {
     expect(allChecked).toBe(false);
   });
 });
+
