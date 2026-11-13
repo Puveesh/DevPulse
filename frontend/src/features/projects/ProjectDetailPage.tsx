@@ -31,7 +31,10 @@ import {
   Square,
 } from 'lucide-react';
 import { formatDate, formatTime, formatDuration } from '../../lib/utils';
-import type { TaskStatus, WorkSession } from '../../types';
+import type { TaskStatus, WorkSession, ApiResponse } from '../../types';
+import { DailyNotesTab } from '../notes/DailyNotesTab';
+import { useDailyNotesHistory } from '../../hooks/useDailyNotes';
+import apiClient from '../../lib/api';
 
 function TaskPriorityBadge({ priority }: { priority: string }) {
   switch (priority) {
@@ -71,12 +74,14 @@ export function ProjectDetailPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<WorkSession | null>(null);
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [taskSuccessMsg, setTaskSuccessMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'tasks' | 'sessions' | 'notes' | 'attachments'>('tasks');
 
   const { data: project, isLoading, isError, error } = useProject(id);
   const { data: tasks, isLoading: isTasksLoading } = useProjectTasks(id);
   const { data: sessionsData, isLoading: isSessionsLoading } = useWorkSessions(0, 50, id);
+  const { data: notesHistory = [] } = useDailyNotesHistory(id);
   const updateTaskStatusMutation = useUpdateTaskStatus(id || '');
 
   const {
@@ -364,6 +369,11 @@ export function ProjectDetailPage() {
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Daily Notes</span>
+            {notesHistory.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-zinc-800 text-zinc-300">
+                {notesHistory.length}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('attachments')}
@@ -426,7 +436,12 @@ export function ProjectDetailPage() {
                   return (
                     <div
                       key={task.id}
-                      className="rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-4 hover:border-zinc-700/80 transition-all space-y-2.5"
+                      id={`task-card-${task.id}`}
+                      className={`rounded-xl border bg-zinc-900/50 p-4 transition-all space-y-2.5 ${
+                        highlightedTaskId === task.id
+                          ? 'border-blue-500 ring-2 ring-blue-500/50 bg-blue-950/20'
+                          : 'border-zinc-800/80 hover:border-zinc-700/80'
+                      }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -600,10 +615,31 @@ export function ProjectDetailPage() {
         )}
 
         {activeTab === 'notes' && (
-          <EmptyState
-            icon={<FileText className="w-6 h-6" />}
-            title="No daily notes for this project"
-            description="Daily journal entries and note indexing are prepared in the MySQL database."
+          <DailyNotesTab
+            projectId={project.id}
+            tasks={tasks}
+            sessions={sessionsData?.content}
+            onSelectTask={(taskId) => {
+              setActiveTab('tasks');
+              setHighlightedTaskId(taskId);
+              setTimeout(() => {
+                const el = document.getElementById(`task-card-${taskId}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }, 100);
+              setTimeout(() => setHighlightedTaskId(null), 4000);
+            }}
+            onSelectSession={(sessionId) => {
+              const matched = (sessionsData?.content || []).find((s) => s.id === sessionId);
+              if (matched) {
+                setSelectedSession(matched);
+              } else {
+                apiClient.get<ApiResponse<WorkSession>>(`/work-sessions/${sessionId}`)
+                  .then((res) => {
+                    if (res.data.data) setSelectedSession(res.data.data);
+                  })
+                  .catch(() => {});
+              }
+            }}
           />
         )}
 

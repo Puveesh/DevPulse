@@ -210,5 +210,28 @@ export interface ProjectTaskSummaryResponse {
   projects: ProjectTaskSummaryItem[];
 }
 
+export interface DailyNote {
+  id: string;
+  userId: string;
+  projectId: string;
+  noteDate: string; // 'YYYY-MM-DD'
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DailyNoteSummary {
+  id: string;
+  projectId: string;
+  noteDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveDailyNotePayload {
+  noteDate?: string;
+  content: string;
+}
+
 
 

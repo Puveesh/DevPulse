@@ -15,13 +15,13 @@ public class DailyNote extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "project_id")
+    @Column(name = "project_id", nullable = false)
     private UUID projectId;
 
     @Column(name = "note_date", nullable = false)
     private LocalDate noteDate;
 
-    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
     public DailyNote() {
