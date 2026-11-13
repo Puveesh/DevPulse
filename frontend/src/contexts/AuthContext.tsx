@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import type { User, ApiResponse, AuthResponseData } from '../types';
+import type { User, ApiResponse, AuthResponseData, UpdateProfilePayload, UpdatePreferencesPayload } from '../types';
 import apiClient, { setAuthToken, getAuthToken, extractErrorMessage } from '../lib/api';
 
 interface AuthContextType {
@@ -11,6 +11,10 @@ interface AuthContextType {
   register: (data: { email: string; password: string; displayName: string }) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateProfile: (payload: UpdateProfilePayload) => Promise<User>;
+  updatePreferences: (payload: UpdatePreferencesPayload) => Promise<User>;
+  uploadAvatar: (dataUrlOrFile: string | File) => Promise<User>;
+  removeAvatar: () => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -83,6 +87,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateProfile = async (payload: UpdateProfilePayload): Promise<User> => {
+    try {
+      const res = await apiClient.put<ApiResponse<User>>('/users/profile', payload);
+      if (res.data?.success && res.data.data) {
+        setUser(res.data.data);
+        return res.data.data;
+      }
+      throw new Error(res.data?.message || 'Failed to update profile');
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
+  const updatePreferences = async (payload: UpdatePreferencesPayload): Promise<User> => {
+    try {
+      const res = await apiClient.put<ApiResponse<User>>('/users/preferences', payload);
+      if (res.data?.success && res.data.data) {
+        setUser(res.data.data);
+        return res.data.data;
+      }
+      throw new Error(res.data?.message || 'Failed to update preferences');
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
+  const uploadAvatar = async (dataUrlOrFile: string | File): Promise<User> => {
+    try {
+      let res;
+      if (typeof dataUrlOrFile === 'string') {
+        res = await apiClient.post<ApiResponse<User>>('/users/profile/avatar', {
+          avatarDataUrl: dataUrlOrFile,
+        });
+      } else {
+        const formData = new FormData();
+        formData.append('file', dataUrlOrFile);
+        res = await apiClient.post<ApiResponse<User>>('/users/profile/avatar', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+      if (res.data?.success && res.data.data) {
+        setUser(res.data.data);
+        return res.data.data;
+      }
+      throw new Error(res.data?.message || 'Failed to upload avatar');
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
+  const removeAvatar = async (): Promise<User> => {
+    try {
+      const res = await apiClient.delete<ApiResponse<User>>('/users/profile/avatar');
+      if (res.data?.success && res.data.data) {
+        setUser(res.data.data);
+        return res.data.data;
+      }
+      throw new Error(res.data?.message || 'Failed to remove avatar');
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
   const value = {
     user,
     token,
@@ -92,6 +159,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     refreshProfile,
+    updateProfile,
+    updatePreferences,
+    uploadAvatar,
+    removeAvatar,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

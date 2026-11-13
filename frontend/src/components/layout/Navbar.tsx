@@ -20,9 +20,9 @@ export function Navbar() {
     <header className="h-14 border-b border-zinc-800/80 bg-zinc-950/40 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
       <div className="flex items-center gap-2.5">
         <span className="text-xs font-medium text-zinc-300">DevPulse Desktop Client</span>
-        <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+        {/* <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
           Desktop Runtime
-        </span>
+        </span> */}
       </div>
 
       <div className="flex items-center gap-4">
@@ -35,15 +35,23 @@ export function Navbar() {
 
         {/* User profile dropdown / info */}
         <div className="flex items-center gap-3 pl-2 border-l border-zinc-800">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-xs font-semibold text-blue-400">
-              {getInitials(user?.displayName)}
-            </div>
+          <Link to="/settings" className="flex items-center gap-2 hover:opacity-85 transition-opacity" title="Developer Settings">
+            {user?.profileImage ? (
+              <img
+                src={user.profileImage}
+                alt={user.displayName || 'Developer'}
+                className="w-8 h-8 rounded-full object-cover border border-blue-500/30"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-xs font-semibold text-blue-400">
+                {getInitials(user?.displayName)}
+              </div>
+            )}
             <div className="hidden sm:block text-left">
               <p className="text-xs font-medium text-zinc-200 leading-none">{user?.displayName}</p>
               <p className="text-[10px] text-zinc-400 font-mono mt-0.5 leading-none">{user?.email}</p>
             </div>
-          </div>
+          </Link>
 
           <Button
             size="sm"

@@ -5,6 +5,44 @@ export interface User {
   email: string;
   displayName: string;
   createdAt: string;
+  bio?: string | null;
+  profileImage?: string | null;
+  professionalTitle?: string | null;
+  experienceLevel?: string | null;
+  programmingLanguages?: string | null;
+  technologies?: string | null;
+  githubUrl?: string | null;
+  portfolioUrl?: string | null;
+  currentFocus?: string | null;
+  timezone?: string | null;
+  dateFormat?: string | null;
+  timeFormat?: string | null;
+  weekStartDay?: string | null;
+  theme?: string | null;
+  accountStatus?: string | null;
+  authMethod?: string | null;
+  databaseInfo?: string | null;
+  dataIsolation?: string | null;
+}
+
+export interface UpdateProfilePayload {
+  displayName: string;
+  bio?: string | null;
+  professionalTitle?: string | null;
+  experienceLevel?: string | null;
+  programmingLanguages?: string | null;
+  technologies?: string | null;
+  githubUrl?: string | null;
+  portfolioUrl?: string | null;
+  currentFocus?: string | null;
+}
+
+export interface UpdatePreferencesPayload {
+  timezone?: string | null;
+  dateFormat?: string | null;
+  timeFormat?: string | null;
+  weekStartDay?: string | null;
+  theme?: string | null;
 }
 
 export interface AuthResponseData {
