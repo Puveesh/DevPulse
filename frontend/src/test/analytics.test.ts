@@ -7,6 +7,8 @@ import {
   calculateWorkingSeconds,
 } from '../lib/utils';
 import { getUserTimezone } from '../hooks/useAnalytics';
+import { groupTimelineByMonthsAndWeeks } from '../features/analytics/ConsistencySection';
+import type { DailyActivity } from '../types';
 
 describe('Analytics Utility & Calculation Tests', () => {
   it('correctly formats hours, minutes, and seconds into standard formats', () => {
@@ -162,6 +164,76 @@ describe('Analytics Utility & Calculation Tests', () => {
       expect(resolveSlot(10800, 7200, 1800, 0)).toBe('Morning (06:00 - 12:00)');
       expect(resolveSlot(0, 0, 7200, 1800)).toBe('Evening (18:00 - 00:00)');
       expect(resolveSlot(0, 0, 0, 0)).toBe('No Activity Recorded');
+    });
+
+    describe('Monthly Contribution Heatmap Grouping (GitHub / LeetCode style)', () => {
+      it('returns empty array when given empty or null timeline', () => {
+        expect(groupTimelineByMonthsAndWeeks([])).toEqual([]);
+        expect(groupTimelineByMonthsAndWeeks(null as any)).toEqual([]);
+      });
+
+      it('groups consecutive days across month boundaries into distinct month blocks', () => {
+        // Oct 30 (Fri), Oct 31 (Sat), Nov 1 (Sun), Nov 2 (Mon)
+        // 2026-10-30 is Friday (dayOfWeek = 4)
+        // 2026-10-31 is Saturday (dayOfWeek = 5)
+        // 2026-11-01 is Sunday (dayOfWeek = 6)
+        // 2026-11-02 is Monday (dayOfWeek = 0)
+        const mockTimeline: DailyActivity[] = [
+          { date: '2026-10-30', day: 'Friday', durationSeconds: 3600, projects: [] },
+          { date: '2026-10-31', day: 'Saturday', durationSeconds: 7200, projects: [] },
+          { date: '2026-11-01', day: 'Sunday', durationSeconds: 1800, projects: [] },
+          { date: '2026-11-02', day: 'Monday', durationSeconds: 5400, projects: [] },
+        ];
+
+        const monthGroups = groupTimelineByMonthsAndWeeks(mockTimeline);
+        expect(monthGroups.length).toBe(2);
+
+        // Check October group
+        expect(monthGroups[0].monthKey).toBe('2026-10');
+        expect(monthGroups[0].monthLabel).toBe('Oct');
+        expect(monthGroups[0].weeks.length).toBe(1);
+        expect(monthGroups[0].weeks[0].length).toBe(7);
+        // Friday index is 4, Saturday index is 5
+        expect(monthGroups[0].weeks[0][4]?.date).toBe('2026-10-30');
+        expect(monthGroups[0].weeks[0][5]?.date).toBe('2026-10-31');
+        expect(monthGroups[0].weeks[0][0]).toBeNull(); // Monday slot is empty
+        expect(monthGroups[0].weeks[0][6]).toBeNull(); // Sunday slot is empty
+
+        // Check November group
+        expect(monthGroups[1].monthKey).toBe('2026-11');
+        expect(monthGroups[1].monthLabel).toBe('Nov');
+        // Nov 1 is Sunday (index 6). Nov 2 is Monday (index 0).
+        // Since dayOfWeek wraps (6 -> 0), it should start a new week column
+        expect(monthGroups[1].weeks.length).toBe(2);
+        expect(monthGroups[1].weeks[0][6]?.date).toBe('2026-11-01');
+        expect(monthGroups[1].weeks[1][0]?.date).toBe('2026-11-02');
+      });
+
+      it('aligns weekdays to 7-slot Monday-to-Sunday columns correctly', () => {
+        // Monday 2026-11-09 to Sunday 2026-11-15 (full 7-day week)
+        const fullWeek: DailyActivity[] = [
+          { date: '2026-11-09', day: 'Monday', durationSeconds: 1000, projects: [] },
+          { date: '2026-11-10', day: 'Tuesday', durationSeconds: 2000, projects: [] },
+          { date: '2026-11-11', day: 'Wednesday', durationSeconds: 3000, projects: [] },
+          { date: '2026-11-12', day: 'Thursday', durationSeconds: 4000, projects: [] },
+          { date: '2026-11-13', day: 'Friday', durationSeconds: 5000, projects: [] },
+          { date: '2026-11-14', day: 'Saturday', durationSeconds: 6000, projects: [] },
+          { date: '2026-11-15', day: 'Sunday', durationSeconds: 7000, projects: [] },
+        ];
+
+        const monthGroups = groupTimelineByMonthsAndWeeks(fullWeek);
+        expect(monthGroups.length).toBe(1);
+        expect(monthGroups[0].weeks.length).toBe(1);
+
+        const week = monthGroups[0].weeks[0];
+        expect(week[0]?.day).toBe('Monday');
+        expect(week[1]?.day).toBe('Tuesday');
+        expect(week[2]?.day).toBe('Wednesday');
+        expect(week[3]?.day).toBe('Thursday');
+        expect(week[4]?.day).toBe('Friday');
+        expect(week[5]?.day).toBe('Saturday');
+        expect(week[6]?.day).toBe('Sunday');
+      });
     });
   });
 });
