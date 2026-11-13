@@ -70,3 +70,4 @@ public class DailyNoteService {
                 .ifPresent(dailyNoteRepository::delete);
     }
 }
+

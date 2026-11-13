@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useProject } from '../../hooks/useProjects';
 import { useProjectTasks, useUpdateTaskStatus } from '../../hooks/useTasks';
 import { useWorkSessionContext } from '../../contexts/WorkSessionContext';
@@ -69,6 +69,7 @@ function TaskPriorityBadge({ priority }: { priority: string }) {
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -76,7 +77,31 @@ export function ProjectDetailPage() {
   const [selectedSession, setSelectedSession] = useState<WorkSession | null>(null);
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const [taskSuccessMsg, setTaskSuccessMsg] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'sessions' | 'notes' | 'attachments'>('tasks');
+
+  const tabParam = searchParams.get('tab') as 'tasks' | 'sessions' | 'notes' | 'attachments' | null;
+  const validTabs: ('tasks' | 'sessions' | 'notes' | 'attachments')[] = ['tasks', 'sessions', 'notes', 'attachments'];
+  const initialTab = tabParam && validTabs.includes(tabParam) ? tabParam : 'tasks';
+
+  const [activeTab, setActiveTab] = useState<'tasks' | 'sessions' | 'notes' | 'attachments'>(initialTab);
+
+  useEffect(() => {
+    const currentTabParam = searchParams.get('tab') as 'tasks' | 'sessions' | 'notes' | 'attachments' | null;
+    if (currentTabParam && validTabs.includes(currentTabParam) && currentTabParam !== activeTab) {
+      setActiveTab(currentTabParam);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (newTab: 'tasks' | 'sessions' | 'notes' | 'attachments') => {
+    setActiveTab(newTab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('tab', newTab);
+        return next;
+      },
+      { replace: true }
+    );
+  };
 
   const { data: project, isLoading, isError, error } = useProject(id);
   const { data: tasks, isLoading: isTasksLoading } = useProjectTasks(id);
@@ -328,7 +353,7 @@ export function ProjectDetailPage() {
       <div className="space-y-4">
         <div className="flex items-center gap-2 border-b border-zinc-800">
           <button
-            onClick={() => setActiveTab('tasks')}
+            onClick={() => handleTabChange('tasks')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === 'tasks'
                 ? 'border-blue-500 text-blue-400'
@@ -344,7 +369,7 @@ export function ProjectDetailPage() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab('sessions')}
+            onClick={() => handleTabChange('sessions')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === 'sessions'
                 ? 'border-blue-500 text-blue-400'
@@ -360,7 +385,7 @@ export function ProjectDetailPage() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab('notes')}
+            onClick={() => handleTabChange('notes')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === 'notes'
                 ? 'border-blue-500 text-blue-400'
@@ -376,7 +401,7 @@ export function ProjectDetailPage() {
             )}
           </button>
           <button
-            onClick={() => setActiveTab('attachments')}
+            onClick={() => handleTabChange('attachments')}
             className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
               activeTab === 'attachments'
                 ? 'border-blue-500 text-blue-400'
@@ -620,7 +645,7 @@ export function ProjectDetailPage() {
             tasks={tasks}
             sessions={sessionsData?.content}
             onSelectTask={(taskId) => {
-              setActiveTab('tasks');
+              handleTabChange('tasks');
               setHighlightedTaskId(taskId);
               setTimeout(() => {
                 const el = document.getElementById(`task-card-${taskId}`);

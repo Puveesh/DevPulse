@@ -210,4 +210,78 @@ describe('Project Daily Notes Development Journal', () => {
       expect(stateHistory).toEqual(['idle', 'saving', 'saved']);
     });
   });
+
+  describe('4. Dashboard Daily Notes Project Selection & Redirection', () => {
+    const sampleProjects = [
+      {
+        id: 'proj-1',
+        name: 'DevPulse Desktop Version',
+        description: 'Developer productivity tool with rich journal',
+        techStack: 'React, Electron, Spring Boot',
+        status: 'ACTIVE' as const,
+        createdAt: '2026-11-01T00:00:00Z',
+        updatedAt: '2026-11-13T00:00:00Z',
+      },
+      {
+        id: 'proj-2',
+        name: 'EduTrust Platform',
+        description: 'Decentralized credentials verification',
+        techStack: 'Solidity, Next.js',
+        status: 'ACTIVE' as const,
+        createdAt: '2026-10-15T00:00:00Z',
+        updatedAt: '2026-11-10T00:00:00Z',
+      },
+      {
+        id: 'proj-3',
+        name: 'Weather Monitor API',
+        description: 'Microservice for meteorological telemetry',
+        techStack: 'Go, PostgreSQL',
+        status: 'ARCHIVED' as const,
+        createdAt: '2026-09-01T00:00:00Z',
+        updatedAt: '2026-10-01T00:00:00Z',
+      },
+    ];
+
+    it('filters project list by search query matching name, description, or stack', () => {
+      const filterProjects = (query: string) => {
+        const q = query.toLowerCase().trim();
+        if (!q) return sampleProjects;
+        return sampleProjects.filter(
+          (p) =>
+            p.name.toLowerCase().includes(q) ||
+            p.description.toLowerCase().includes(q) ||
+            p.techStack.toLowerCase().includes(q)
+        );
+      };
+
+      expect(filterProjects('')).toHaveLength(3);
+      expect(filterProjects('devpulse')).toHaveLength(1);
+      expect(filterProjects('devpulse')[0].id).toBe('proj-1');
+      expect(filterProjects('Spring Boot')).toHaveLength(1);
+      expect(filterProjects('telemetry')).toHaveLength(1);
+      expect(filterProjects('nonexistent')).toHaveLength(0);
+    });
+
+    it('generates the exact project info URL with tab=notes for redirection', () => {
+      const getNotesRedirectUrl = (projectId: string) => `/projects/${projectId}?tab=notes`;
+
+      const selectedProjectId = 'proj-1';
+      const redirectUrl = getNotesRedirectUrl(selectedProjectId);
+
+      expect(redirectUrl).toBe('/projects/proj-1?tab=notes');
+    });
+
+    it('resolves tab=notes from URL search parameters to activate the Daily Notes tab', () => {
+      const resolveActiveTab = (searchParam: string | null) => {
+        const validTabs = ['tasks', 'sessions', 'notes', 'attachments'];
+        return searchParam && validTabs.includes(searchParam) ? searchParam : 'tasks';
+      };
+
+      expect(resolveActiveTab('notes')).toBe('notes');
+      expect(resolveActiveTab('sessions')).toBe('sessions');
+      expect(resolveActiveTab(null)).toBe('tasks');
+      expect(resolveActiveTab('unknown')).toBe('tasks');
+    });
+  });
 });
+

@@ -21,6 +21,7 @@ import {
   Calendar,
   Terminal,
   Square,
+  FileText,
 } from 'lucide-react';
 import { formatDate, formatDuration, formatTime, formatDurationHoursMinutes } from '../../lib/utils';
 import { SessionDetailModal } from '../worklog/SessionDetailModal';
@@ -28,6 +29,7 @@ import { WeeklyActivityChart } from './WeeklyActivityChart';
 import { WeeklyStatisticsModal } from './WeeklyStatisticsModal';
 import { TodayWorklogModal } from './TodayWorklogModal';
 import { ProjectTaskOverview } from './ProjectTaskOverview';
+import { SelectProjectModal } from './SelectProjectModal';
 import type { WorkSession } from '../../types';
 
 export function DashboardPage() {
@@ -51,6 +53,7 @@ export function DashboardPage() {
   const [selectedDetailSession, setSelectedDetailSession] = useState<WorkSession | null>(null);
   const [isWeeklyStatsModalOpen, setIsWeeklyStatsModalOpen] = useState(false);
   const [isTodayWorklogModalOpen, setIsTodayWorklogModalOpen] = useState(false);
+  const [isSelectProjectModalOpen, setIsSelectProjectModalOpen] = useState(false);
 
   const activeProjects = projects?.filter((p) => p.status === 'ACTIVE') || [];
   const activeCount = activeProjects.length;
@@ -146,6 +149,14 @@ export function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            variant="outline"
+            leftIcon={<FileText className="w-3.5 h-3.5 text-blue-400" />}
+            onClick={() => setIsSelectProjectModalOpen(true)}
+          >
+            Daily Notes
+          </Button>
           <Link to="/projects?action=create">
             <Button size="sm" leftIcon={<Plus className="w-3.5 h-3.5" />}>
               New Project
@@ -341,7 +352,19 @@ export function DashboardPage() {
                       )}
                     </div>
 
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/projects/${project.id}?tab=notes`);
+                        }}
+                        title={`Open Daily Notes for ${project.name}`}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-zinc-800/80 hover:bg-zinc-750 text-blue-400 hover:text-blue-300 border border-zinc-750 transition-colors"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Daily Notes</span>
+                      </button>
                       <span className="text-[11px] text-zinc-500 block font-mono">
                         Updated {formatDate(project.updatedAt)}
                       </span>
@@ -463,11 +486,11 @@ export function DashboardPage() {
 
               <Button
                 variant="outline"
-                className="w-full justify-start text-xs font-medium opacity-80"
-                leftIcon={<Calendar className="w-4 h-4 text-purple-400 mr-1" />}
-                onClick={() => alert('Daily journal and markdown notes will be enabled in Phase 2.')}
+                className="w-full justify-start text-xs font-medium"
+                leftIcon={<FileText className="w-4 h-4 text-purple-400 mr-1" />}
+                onClick={() => setIsSelectProjectModalOpen(true)}
               >
-                Write Daily Note
+                Daily Notes
               </Button>
             </CardContent>
           </Card>
@@ -532,6 +555,12 @@ export function DashboardPage() {
       <WeeklyStatisticsModal
         isOpen={isWeeklyStatsModalOpen}
         onClose={() => setIsWeeklyStatsModalOpen(false)}
+      />
+
+      {/* Select Project for Daily Notes Modal */}
+      <SelectProjectModal
+        isOpen={isSelectProjectModalOpen}
+        onClose={() => setIsSelectProjectModalOpen(false)}
       />
     </div>
   );

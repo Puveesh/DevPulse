@@ -188,3 +188,4 @@ class DailyNoteIntegrationTest {
                 .andExpect(jsonPath("$.success", is(false)));
     }
 }
+

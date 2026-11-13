@@ -76,3 +76,4 @@ public class DailyNoteController {
         return ResponseEntity.ok(ApiResponse.success("Daily note deleted successfully", null));
     }
 }
+
