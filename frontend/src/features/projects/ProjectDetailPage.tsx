@@ -687,7 +687,8 @@ export function ProjectDetailPage() {
       {/* Delete Confirmation */}
       <DeleteProjectDialog
         isOpen={isDeleteDialogOpen}
-        onClose={() => {
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onSuccess={() => {
           setIsDeleteDialogOpen(false);
           navigate('/projects');
         }}
