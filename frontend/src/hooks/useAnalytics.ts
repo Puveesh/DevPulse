@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import apiClient, { getAuthToken } from '../lib/api';
-import type { ApiResponse, TodayAnalytics, WeeklyAnalytics } from '../types';
+import type { ApiResponse, TodayAnalytics, WeeklyAnalytics, AnalyticsReport, AnalyticsDatePreset } from '../types';
 
 export function getUserTimezone(): string {
   try {
@@ -52,4 +52,35 @@ export function useWeeklyAnalytics(customTimezone?: string, weekStart?: string) 
     refetchOnWindowFocus: true,
   });
 }
+
+export function useAnalyticsReport(
+  preset: AnalyticsDatePreset = 'LAST_30_DAYS',
+  startDate?: string,
+  endDate?: string,
+  customTimezone?: string
+) {
+  const token = getAuthToken();
+  const tz = customTimezone || getUserTimezone();
+
+  return useQuery({
+    queryKey: ['analytics', 'report', preset, startDate, endDate, tz],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.set('preset', preset);
+      params.set('timezone', tz);
+      if (startDate) params.set('startDate', startDate);
+      if (endDate) params.set('endDate', endDate);
+
+      const res = await apiClient.get<ApiResponse<AnalyticsReport>>(
+        `/analytics/report?${params.toString()}`
+      );
+      return res.data.data;
+    },
+    enabled: !!token,
+    staleTime: 1000 * 20, // 20s
+    refetchInterval: token ? 20000 : false,
+    refetchOnWindowFocus: true,
+  });
+}
+
 

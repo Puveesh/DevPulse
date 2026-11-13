@@ -63,10 +63,18 @@ class AnalyticsIntegrationTest {
     @Autowired
     private SessionPauseIntervalRepository pauseIntervalRepository;
 
+    @Autowired
+    private com.devpulse.task.TaskRepository taskRepository;
+
+    @Autowired
+    private com.devpulse.worklog.DailyNoteRepository dailyNoteRepository;
+
     @BeforeEach
     void setUp() {
         pauseIntervalRepository.deleteAll();
         workSessionRepository.deleteAll();
+        dailyNoteRepository.deleteAll();
+        taskRepository.deleteAll();
         projectRepository.deleteAll();
         userRepository.deleteAll();
     }
@@ -303,6 +311,67 @@ class AnalyticsIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalDurationSeconds", is(0)))
                 .andExpect(jsonPath("$.data.sessionCount", is(0)));
+    }
+
+    @Test
+    void testComprehensiveAnalyticsReport() throws Exception {
+        String token = registerAndGetToken("report-user@devpulse.io", "Report User");
+        UUID userId = userRepository.findByEmail("report-user@devpulse.io").orElseThrow().getId();
+
+        Project projA = projectRepository.save(new Project(userId, "Cloud Engine", "Backend API", null, "Java", ProjectStatus.ACTIVE));
+        Project projB = projectRepository.save(new Project(userId, "Web App", "Frontend Client", null, "React", ProjectStatus.ACTIVE));
+
+        Instant now = Instant.now();
+
+        // Work session for Project A (2 hours = 7200s)
+        WorkSession s1 = new WorkSession(userId, projA.getId(), null, "Develop Core Engine", "Initial build", now.minusSeconds(10000));
+        s1.setEndedAt(now.minusSeconds(2800));
+        s1.setStatus(WorkSessionStatus.COMPLETED);
+        s1.setTotalDurationSeconds(7200L);
+        workSessionRepository.save(s1);
+
+        // Tasks for Project A (1 completed, 1 in-progress, 1 todo)
+        taskRepository.save(new com.devpulse.task.Task(userId, projA.getId(), "Setup Auth", "JWT setup", com.devpulse.task.TaskStatus.COMPLETED, com.devpulse.task.TaskPriority.HIGH, null));
+        taskRepository.save(new com.devpulse.task.Task(userId, projA.getId(), "Add Logging", "logback", com.devpulse.task.TaskStatus.IN_PROGRESS, com.devpulse.task.TaskPriority.MEDIUM, null));
+        taskRepository.save(new com.devpulse.task.Task(userId, projA.getId(), "Deploy Docs", "swagger", com.devpulse.task.TaskStatus.TODO, com.devpulse.task.TaskPriority.LOW, null));
+
+        // Test GET /api/v1/analytics/report
+        mockMvc.perform(get("/api/v1/analytics/report?preset=LAST_7_DAYS&timezone=UTC")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.dateRange.preset", is("LAST_7_DAYS")))
+                .andExpect(jsonPath("$.data.overview.totalWorkingSeconds", is(7200)))
+                .andExpect(jsonPath("$.data.overview.totalSessions", is(1)))
+                .andExpect(jsonPath("$.data.overview.activeDays", is(1)))
+                .andExpect(jsonPath("$.data.overview.activeProjectCount", is(1)))
+                .andExpect(jsonPath("$.data.projects", hasSize(2)))
+                .andExpect(jsonPath("$.data.projects[0].projectName", is("Cloud Engine")))
+                .andExpect(jsonPath("$.data.projects[0].totalWorkingSeconds", is(7200)))
+                .andExpect(jsonPath("$.data.projects[0].totalTasks", is(3)))
+                .andExpect(jsonPath("$.data.projects[0].completedTasks", is(1)))
+                .andExpect(jsonPath("$.data.tasks.totalTasks", is(3)))
+                .andExpect(jsonPath("$.data.tasks.completedTasks", is(1)))
+                .andExpect(jsonPath("$.data.consistency.currentStreak", notNullValue()))
+                .andExpect(jsonPath("$.data.insights", notNullValue()))
+                .andExpect(jsonPath("$.data.recentActivities", notNullValue()));
+
+        // Test Sub-Endpoints
+        mockMvc.perform(get("/api/v1/analytics/overview?preset=LAST_7_DAYS&timezone=UTC")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalWorkingSeconds", is(7200)));
+
+        mockMvc.perform(get("/api/v1/analytics/project-distribution?preset=LAST_7_DAYS&timezone=UTC")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)));
+
+        mockMvc.perform(get("/api/v1/analytics/task-progress?preset=LAST_7_DAYS&timezone=UTC")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalTasks", is(3)))
+                .andExpect(jsonPath("$.data.completedTasks", is(1)));
     }
 }
 

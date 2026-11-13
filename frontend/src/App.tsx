@@ -10,6 +10,7 @@ import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
 import { ProjectDetailPage } from './features/projects/ProjectDetailPage';
 import { WorkSessionsPage } from './features/worklog/WorkSessionsPage';
+import { AnalyticsPage } from './features/analytics/AnalyticsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { EmptyState } from './components/common/EmptyState';
@@ -44,22 +45,7 @@ export function App() {
                   <Route path="/projects" element={<ProjectsPage />} />
                   <Route path="/projects/:id" element={<ProjectDetailPage />} />
                   <Route path="/worklogs" element={<WorkSessionsPage />} />
-                  <Route
-                    path="/analytics"
-                    element={
-                      <div className="space-y-6">
-                        <div className="border-b border-zinc-800 pb-6">
-                          <h1 className="text-2xl font-bold tracking-tight text-white">Developer Analytics</h1>
-                          <p className="text-xs text-zinc-400 mt-1">Productivity velocity and time distribution.</p>
-                        </div>
-                        <EmptyState
-                          icon={<BarChart3 className="w-8 h-8 text-emerald-400" />}
-                          title="Productivity Insights"
-                          description="Derived productivity graphs and weekly summary charts will compute automatically once development logs accumulate."
-                        />
-                      </div>
-                    }
-                  />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                 </Route>
               </Route>

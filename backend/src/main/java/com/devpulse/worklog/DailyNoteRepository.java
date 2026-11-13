@@ -14,6 +14,7 @@ import java.util.UUID;
 public interface DailyNoteRepository extends JpaRepository<DailyNote, UUID> {
     Optional<DailyNote> findByIdAndUserId(UUID id, UUID userId);
     Optional<DailyNote> findByProjectIdAndUserIdAndNoteDate(UUID projectId, UUID userId, LocalDate noteDate);
+    List<DailyNote> findByUserIdOrderByNoteDateDesc(UUID userId);
     List<DailyNote> findByProjectIdAndUserIdOrderByNoteDateDesc(UUID projectId, UUID userId);
     Page<DailyNote> findByProjectIdAndUserIdOrderByNoteDateDesc(UUID projectId, UUID userId, Pageable pageable);
     boolean existsByProjectIdAndUserIdAndNoteDate(UUID projectId, UUID userId, LocalDate noteDate);

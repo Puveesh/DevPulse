@@ -168,6 +168,108 @@ export interface WeeklyAnalytics {
   dailyActivity: DailyActivity[];
 }
 
+export type AnalyticsDatePreset =
+  | 'LAST_7_DAYS'
+  | 'LAST_30_DAYS'
+  | 'LAST_90_DAYS'
+  | 'THIS_WEEK'
+  | 'THIS_MONTH'
+  | 'THIS_YEAR'
+  | 'ALL_TIME'
+  | 'CUSTOM';
+
+export interface DateRangeInfo {
+  preset: AnalyticsDatePreset;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+}
+
+export interface ProductivityOverview {
+  totalWorkingSeconds: number;
+  averageDailyWorkingSeconds: number;
+  averageActiveDayWorkingSeconds: number;
+  totalSessions: number;
+  activeDays: number;
+  activeProjectCount: number;
+  tasksCompleted: number;
+  totalElapsedActiveSeconds: number;
+}
+
+export interface ProjectAnalytics {
+  projectId: string;
+  projectName: string;
+  techStack?: string | null;
+  status: string;
+  totalWorkingSeconds: number;
+  percentageOfTotalTime: number;
+  sessionCount: number;
+  activeDays: number;
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  todoTasks: number;
+  cancelledTasks: number;
+  completionPercentage: number;
+}
+
+export interface TaskOverview {
+  totalTasks: number;
+  completedTasks: number;
+  inProgressTasks: number;
+  todoTasks: number;
+  cancelledTasks: number;
+  overallCompletionPercentage: number;
+}
+
+export interface ConsistencyMetrics {
+  currentStreak: number;
+  longestStreak: number;
+  activeDays: number;
+  totalDays: number;
+  activeDaysRatio: number;
+  mostActiveWeekday: string;
+  mostActiveDaySeconds: number;
+  leastActiveDaySeconds: number;
+  averageActiveDaySeconds: number;
+  morningSeconds: number;
+  afternoonSeconds: number;
+  eveningSeconds: number;
+  nightSeconds: number;
+  mostProductiveTimeSlot: string;
+}
+
+export interface AnalyticsInsight {
+  type: string;
+  title: string;
+  description: string;
+  category: 'WORK_PATTERN' | 'PROJECT_FOCUS' | 'TASK_VELOCITY' | 'CONSISTENCY' | 'RECOMMENDATION';
+  level: 'INFO' | 'SUCCESS' | 'WARNING';
+}
+
+export interface RecentActivityItem {
+  id: string;
+  type: 'SESSION_COMPLETED' | 'SESSION_ACTIVE' | 'TASK_COMPLETED' | 'TASK_CREATED' | 'NOTE_SAVED';
+  title: string;
+  description: string;
+  projectId?: string | null;
+  projectName: string;
+  timestamp: string;
+  durationSeconds?: number | null;
+  status?: string | null;
+}
+
+export interface AnalyticsReport {
+  dateRange: DateRangeInfo;
+  overview: ProductivityOverview;
+  dailyTimeline: DailyActivity[];
+  projects: ProjectAnalytics[];
+  tasks: TaskOverview;
+  consistency: ConsistencyMetrics;
+  insights: AnalyticsInsight[];
+  recentActivities: RecentActivityItem[];
+}
+
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
