@@ -176,3 +176,4 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
     </div>
   );
 };
+

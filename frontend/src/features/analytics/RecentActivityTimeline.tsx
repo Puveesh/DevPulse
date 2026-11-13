@@ -125,3 +125,4 @@ export const RecentActivityTimeline: React.FC<RecentActivityTimelineProps> = ({
     </div>
   );
 };
+

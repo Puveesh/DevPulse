@@ -142,3 +142,4 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 }
+

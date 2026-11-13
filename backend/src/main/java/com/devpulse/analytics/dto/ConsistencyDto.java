@@ -17,3 +17,4 @@ public record ConsistencyDto(
         String mostProductiveTimeSlot
 ) {
 }
+

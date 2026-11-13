@@ -158,3 +158,4 @@ export const TaskProgressSection: React.FC<TaskProgressSectionProps> = ({
     </div>
   );
 };
+

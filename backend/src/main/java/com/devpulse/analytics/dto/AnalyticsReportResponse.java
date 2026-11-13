@@ -13,3 +13,4 @@ public record AnalyticsReportResponse(
         List<RecentActivityItemDto> recentActivities
 ) {
 }
+

@@ -83,3 +83,4 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Profile avatar removed successfully", response));
     }
 }
+

@@ -288,3 +288,4 @@ export const ProjectDistributionSection: React.FC<ProjectDistributionSectionProp
     </div>
   );
 };
+

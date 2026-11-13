@@ -20,7 +20,7 @@ export function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 shrink-0 border-r border-zinc-800/80 bg-zinc-950/70 flex flex-col justify-between h-screen sticky top-0 backdrop-blur-md">
+    <aside className="w-50 shrink-0 border-r border-zinc-800/80 bg-zinc-950/70 flex flex-col justify-between h-screen sticky top-0 backdrop-blur-md">
       <div className="p-4 space-y-6">
         {/* Brand */}
         <div className="flex items-center gap-2.5 px-2 py-1">

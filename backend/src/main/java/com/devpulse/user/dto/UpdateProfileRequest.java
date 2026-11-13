@@ -34,3 +34,4 @@ public record UpdateProfileRequest(
         String currentFocus
 ) {
 }
+

@@ -14,3 +14,4 @@ ALTER TABLE users ADD COLUMN time_format VARCHAR(20) DEFAULT '24-hour';
 ALTER TABLE users ADD COLUMN week_start_day VARCHAR(20) DEFAULT 'Monday';
 ALTER TABLE users ADD COLUMN theme VARCHAR(50) DEFAULT 'dark';
 ALTER TABLE users ADD COLUMN profile_image LONGTEXT;
+

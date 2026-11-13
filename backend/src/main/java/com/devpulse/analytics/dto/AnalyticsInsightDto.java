@@ -8,3 +8,4 @@ public record AnalyticsInsightDto(
         String level
 ) {
 }
+

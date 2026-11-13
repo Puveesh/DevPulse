@@ -166,3 +166,4 @@ export const DevelopmentTimeChart: React.FC<DevelopmentTimeChartProps> = ({
     </div>
   );
 };
+

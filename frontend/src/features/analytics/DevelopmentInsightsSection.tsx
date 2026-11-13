@@ -80,3 +80,4 @@ export const DevelopmentInsightsSection: React.FC<DevelopmentInsightsSectionProp
     </div>
   );
 };
+
