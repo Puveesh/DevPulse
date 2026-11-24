@@ -32,9 +32,7 @@ let mainWindow: BrowserWindow | null = null
 // Configurable backend API URL
 const BACKEND_URL =
   process.env.DEVPULSE_BACKEND_URL ||
-  process.env.VITE_API_BASE_URL ||
   process.env.VITE_BACKEND_URL ||
-  process.env.VITE_API_URL ||
   'http://localhost:8081'
 
 function resolvePreloadPath(): string {
