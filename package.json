@@ -12,6 +12,6 @@
     "dist:dir": "npm --prefix frontend run dist:dir",
     "test": "npm --prefix frontend run test",
     "test:backend": "cd backend && mvn test"
-  }
+  },
+  "version": "0.0.1"
 }
-
