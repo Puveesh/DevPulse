@@ -37,6 +37,7 @@ export function useCreateTask(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
       queryClient.invalidateQueries({ queryKey: ['project-task-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-tasks'] });
     },
   });
 }
@@ -59,6 +60,7 @@ export function useUpdateTaskStatus(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
       queryClient.invalidateQueries({ queryKey: ['project-task-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-tasks'] });
     },
   });
 }
@@ -81,6 +83,7 @@ export function useUpdateTask(projectId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
       queryClient.invalidateQueries({ queryKey: ['project-task-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-tasks'] });
     },
   });
 }
@@ -93,6 +96,47 @@ export function useProjectTaskSummary() {
       return res.data.data?.projects || [];
     },
     staleTime: 1000 * 30, // 30 seconds
+  });
+}
+
+export function useRecentTasks(limit: number = 10) {
+  return useQuery({
+    queryKey: ['recent-tasks', limit],
+    queryFn: async (): Promise<Task[]> => {
+      try {
+        const res = await apiClient.get<ApiResponse<Task[]>>(`/tasks/recent?limit=${limit}`);
+        if (res.data?.data) {
+          return res.data.data;
+        }
+      } catch (err) {
+        // Fallback: If /tasks/recent fails (e.g. temporary restart or network latency),
+        // query project tasks directly across projects so the UI remains 100% resilient
+        try {
+          const projRes = await apiClient.get<ApiResponse<{ id: string; name: string }[]>>('/projects');
+          const projects = projRes.data?.data || [];
+          if (projects.length === 0) return [];
+
+          const taskPromises = projects.slice(0, 10).map(async (p) => {
+            try {
+              const tRes = await apiClient.get<ApiResponse<Task[]>>(`/projects/${p.id}/tasks`);
+              return (tRes.data?.data || []).map((t) => ({ ...t, projectName: p.name }));
+            } catch {
+              return [];
+            }
+          });
+
+          const allTasks = (await Promise.all(taskPromises)).flat();
+          return allTasks
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, limit);
+        } catch {
+          throw err;
+        }
+      }
+      return [];
+    },
+    staleTime: 1000 * 30, // 30 seconds
+    retry: 2,
   });
 }
 

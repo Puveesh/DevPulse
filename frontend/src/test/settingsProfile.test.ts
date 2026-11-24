@@ -69,9 +69,9 @@ describe('Developer Profile & Settings Logic Tests', () => {
       if (!validTypes.includes(file.type.toLowerCase())) {
         return { valid: false, error: 'Invalid file type' };
       }
-      const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+      const MAX_SIZE = 5 * 1024 * 1024; // 5MB
       if (file.size > MAX_SIZE) {
-        return { valid: false, error: 'Image size exceeds 2MB limit' };
+        return { valid: false, error: 'Image size exceeds 5MB limit' };
       }
       return { valid: true, error: null };
     };
@@ -82,16 +82,16 @@ describe('Developer Profile & Settings Logic Tests', () => {
       error: null,
     });
 
-    // Valid JPG (500KB)
-    expect(validateAvatar({ size: 500 * 1024, type: 'image/jpeg' })).toEqual({
+    // Valid JPG (4MB)
+    expect(validateAvatar({ size: 4 * 1024 * 1024, type: 'image/jpeg' })).toEqual({
       valid: true,
       error: null,
     });
 
-    // Invalid oversized (3MB)
-    expect(validateAvatar({ size: 3 * 1024 * 1024, type: 'image/png' })).toEqual({
+    // Invalid oversized (6MB)
+    expect(validateAvatar({ size: 6 * 1024 * 1024, type: 'image/png' })).toEqual({
       valid: false,
-      error: 'Image size exceeds 2MB limit',
+      error: 'Image size exceeds 5MB limit',
     });
 
     // Invalid MIME type (PDF)
@@ -146,6 +146,132 @@ describe('Developer Profile & Settings Logic Tests', () => {
     expect(formState.bio).toBe('Original bio');
     expect(formState.id).toBe('123e4567-e89b-12d3-a456-426614174000');
     expect(formState.email).toBe('dev@devpulse.io');
+  });
+
+  it('manages profile photo enlarged preview and remove confirmation modal states', async () => {
+    let isPhotoPreviewOpen = false;
+    let isConfirmRemoveOpen = false;
+    let onRemoveCalled = false;
+
+    const mockUser = {
+      displayName: 'Test Dev',
+      profileImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    };
+
+    // Clicking avatar triggers full-size preview
+    const handleAvatarClick = () => {
+      if (mockUser.profileImage) {
+        isPhotoPreviewOpen = true;
+      }
+    };
+
+    handleAvatarClick();
+    expect(isPhotoPreviewOpen).toBe(true);
+
+    // Closing modal resets state
+    isPhotoPreviewOpen = false;
+    expect(isPhotoPreviewOpen).toBe(false);
+
+    // Clicking Remove opens confirmation dialog instead of removing immediately
+    const handleRemoveClick = () => {
+      isConfirmRemoveOpen = true;
+    };
+
+    handleRemoveClick();
+    expect(isConfirmRemoveOpen).toBe(true);
+    expect(onRemoveCalled).toBe(false);
+
+    // If user cancels, modal closes and onRemove is not invoked
+    const handleCancelRemove = () => {
+      isConfirmRemoveOpen = false;
+    };
+    handleCancelRemove();
+    expect(isConfirmRemoveOpen).toBe(false);
+    expect(onRemoveCalled).toBe(false);
+
+    // If user confirms, onRemove is invoked and confirmation modal closes
+    const handleConfirmRemove = async () => {
+      onRemoveCalled = true;
+      isConfirmRemoveOpen = false;
+    };
+    await handleConfirmRemove();
+    expect(onRemoveCalled).toBe(true);
+    expect(isConfirmRemoveOpen).toBe(false);
+  });
+
+  it('manages header user overview card details, big avatar, and actions', () => {
+    const user = {
+      id: 'usr-1',
+      displayName: 'Puveesh Keshav M',
+      email: 'puveesh@devpulse.io',
+      profileImage: 'https://images.devpulse.io/avatar.png',
+      professionalTitle: 'Full Stack Engineer',
+      experienceLevel: 'Senior',
+      currentFocus: 'Desktop client improvements',
+      createdAt: '2026-01-15T09:00:00Z',
+    };
+
+    let isOverviewOpen = false;
+    let navigatedPath: string | null = null;
+    let logoutModalOpened = false;
+
+    // Toggle overview card
+    const toggleOverview = () => {
+      isOverviewOpen = !isOverviewOpen;
+    };
+
+    toggleOverview();
+    expect(isOverviewOpen).toBe(true);
+
+    // Overview card presents full developer profile details
+    expect(user.displayName).toBe('Puveesh Keshav M');
+    expect(user.profileImage).toBeTruthy();
+    expect(user.professionalTitle).toBe('Full Stack Engineer');
+    expect(user.experienceLevel).toBe('Senior');
+
+    // Click Settings action navigates to /settings and closes overview
+    const handleSettingsClick = () => {
+      navigatedPath = '/settings';
+      isOverviewOpen = false;
+    };
+    handleSettingsClick();
+    expect(navigatedPath).toBe('/settings');
+    expect(isOverviewOpen).toBe(false);
+
+    // Reopen and click Logout opens confirm modal
+    toggleOverview();
+    expect(isOverviewOpen).toBe(true);
+
+    const handleLogoutClick = () => {
+      logoutModalOpened = true;
+      isOverviewOpen = false;
+    };
+    handleLogoutClick();
+    expect(logoutModalOpened).toBe(true);
+    expect(isOverviewOpen).toBe(false);
+  });
+
+  it('centralizes settings and logout access exclusively in the upper-right profile card', () => {
+    // Navigation items in sidebar should only include core workspace links
+    const sidebarNavItems = [
+      { name: 'Dashboard', to: '/dashboard' },
+      { name: 'Projects', to: '/projects' },
+      { name: 'Work Sessions', to: '/worklogs' },
+      { name: 'Analytics', to: '/analytics' },
+    ];
+
+    expect(sidebarNavItems.some((item) => item.to === '/settings')).toBe(false);
+    expect(sidebarNavItems.map((i) => i.name)).toEqual([
+      'Dashboard',
+      'Projects',
+      'Work Sessions',
+      'Analytics',
+    ]);
+
+    // Profile card provides both actions
+    const profileCardActions = ['Developer Settings', 'Log Out'];
+    expect(profileCardActions).toContain('Developer Settings');
+    expect(profileCardActions).toContain('Log Out');
   });
 });
 

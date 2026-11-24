@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -54,6 +55,15 @@ public class TaskController {
             @AuthenticationPrincipal UserPrincipal principal) {
         List<TaskResponse> tasks = taskService.getTasksForProject(principal.getId(), projectId);
         return ResponseEntity.ok(ApiResponse.success("Tasks retrieved successfully", tasks));
+    }
+
+    @GetMapping({"/api/v1/tasks/recent", "/api/v1/dashboard/tasks"})
+    @Operation(summary = "Get recent tasks", description = "Retrieves recent tasks across all projects for the authenticated user")
+    public ResponseEntity<ApiResponse<List<TaskResponse>>> getRecentTasks(
+            @RequestParam(defaultValue = "10") int limit,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        List<TaskResponse> tasks = taskService.getRecentTasks(principal.getId(), limit);
+        return ResponseEntity.ok(ApiResponse.success("Recent tasks retrieved successfully", tasks));
     }
 
     @PatchMapping("/api/v1/projects/{projectId}/tasks/{taskId}/status")
@@ -96,4 +106,3 @@ public class TaskController {
         return ResponseEntity.ok(ApiResponse.success("Project task summary retrieved successfully", response));
     }
 }
-

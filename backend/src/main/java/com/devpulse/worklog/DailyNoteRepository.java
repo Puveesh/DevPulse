@@ -3,6 +3,9 @@ package com.devpulse.worklog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
@@ -18,5 +21,8 @@ public interface DailyNoteRepository extends JpaRepository<DailyNote, UUID> {
     List<DailyNote> findByProjectIdAndUserIdOrderByNoteDateDesc(UUID projectId, UUID userId);
     Page<DailyNote> findByProjectIdAndUserIdOrderByNoteDateDesc(UUID projectId, UUID userId, Pageable pageable);
     boolean existsByProjectIdAndUserIdAndNoteDate(UUID projectId, UUID userId, LocalDate noteDate);
-}
 
+    @Modifying
+    @Query("DELETE FROM DailyNote n WHERE n.userId = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
+}

@@ -3,6 +3,10 @@ package com.devpulse.worklog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -11,7 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface WorkSessionRepository extends JpaRepository<WorkSession, UUID> {
+public interface WorkSessionRepository extends JpaRepository<WorkSession, UUID>, JpaSpecificationExecutor<WorkSession> {
     Optional<WorkSession> findByIdAndUserId(UUID id, UUID userId);
 
     Optional<WorkSession> findFirstByUserIdAndStatusInOrderByStartedAtDesc(UUID userId, Collection<WorkSessionStatus> statuses);
@@ -28,21 +32,27 @@ public interface WorkSessionRepository extends JpaRepository<WorkSession, UUID> 
 
     List<WorkSession> findTop10ByUserIdOrderByStartedAtDesc(UUID userId);
 
-    @org.springframework.data.jpa.repository.Query("SELECT s FROM WorkSession s WHERE s.userId = :userId AND s.startedAt < :windowEnd AND (s.endedAt IS NULL OR s.endedAt >= :windowStart)")
+    Optional<WorkSession> findFirstByUserIdOrderByStartedAtAsc(UUID userId);
+
+    @Modifying
+    @Query("DELETE FROM WorkSession w WHERE w.userId = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
+
+    @Query("SELECT s FROM WorkSession s WHERE s.userId = :userId AND s.startedAt < :windowEnd AND (s.endedAt IS NULL OR s.endedAt >= :windowStart)")
     List<WorkSession> findSessionsIntersectingWindow(
-            @org.springframework.data.repository.query.Param("userId") UUID userId,
-            @org.springframework.data.repository.query.Param("windowStart") java.time.Instant windowStart,
-            @org.springframework.data.repository.query.Param("windowEnd") java.time.Instant windowEnd
+            @Param("userId") UUID userId,
+            @Param("windowStart") java.time.Instant windowStart,
+            @Param("windowEnd") java.time.Instant windowEnd
     );
 
-    @org.springframework.data.jpa.repository.Query("SELECT MAX(COALESCE(w.endedAt, w.startedAt)) FROM WorkSession w WHERE w.userId = :userId AND w.projectId = :projectId")
+    @Query("SELECT MAX(COALESCE(w.endedAt, w.startedAt)) FROM WorkSession w WHERE w.userId = :userId AND w.projectId = :projectId")
     Optional<java.time.Instant> findLatestActivityByProjectId(
-            @org.springframework.data.repository.query.Param("userId") UUID userId,
-            @org.springframework.data.repository.query.Param("projectId") UUID projectId
+            @Param("userId") UUID userId,
+            @Param("projectId") UUID projectId
     );
 
-    @org.springframework.data.jpa.repository.Query("SELECT w.projectId, MAX(COALESCE(w.endedAt, w.startedAt)) FROM WorkSession w WHERE w.userId = :userId GROUP BY w.projectId")
+    @Query("SELECT w.projectId, MAX(COALESCE(w.endedAt, w.startedAt)) FROM WorkSession w WHERE w.userId = :userId GROUP BY w.projectId")
     List<Object[]> findLatestActivityByUserIdGroupByProjectId(
-            @org.springframework.data.repository.query.Param("userId") UUID userId
+            @Param("userId") UUID userId
     );
 }

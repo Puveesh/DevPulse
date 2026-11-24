@@ -70,6 +70,29 @@ public class TaskService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<TaskResponse> getRecentTasks(UUID userId, int limit) {
+        int max = (limit > 0 && limit <= 50) ? limit : 10;
+        List<Task> tasks = taskRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        Map<UUID, String> projectNameMap = new HashMap<>();
+
+        return tasks.stream()
+                .limit(max)
+                .map(t -> {
+                    String projectName = null;
+                    if (t.getProjectId() != null) {
+                        projectName = projectNameMap.computeIfAbsent(
+                                t.getProjectId(),
+                                pid -> projectRepository.findByIdAndUserId(pid, userId)
+                                        .map(Project::getName)
+                                        .orElse(null)
+                        );
+                    }
+                    return TaskResponse.fromTask(t, projectName);
+                })
+                .toList();
+    }
+
     @Transactional
     public TaskResponse updateTaskStatus(UUID userId, UUID projectId, UUID taskId, UpdateTaskStatusRequest request) {
         // Verify project ownership
@@ -165,4 +188,3 @@ public class TaskService {
         return new ProjectTaskSummaryResponse(summaryList);
     }
 }
-

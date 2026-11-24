@@ -11,6 +11,7 @@ public record TaskResponse(
         UUID id,
         UUID userId,
         UUID projectId,
+        String projectName,
         String title,
         String description,
         TaskStatus status,
@@ -20,10 +21,15 @@ public record TaskResponse(
         Instant updatedAt
 ) {
     public static TaskResponse fromTask(Task task) {
+        return fromTask(task, null);
+    }
+
+    public static TaskResponse fromTask(Task task, String projectName) {
         return new TaskResponse(
                 task.getId(),
                 task.getUserId(),
                 task.getProjectId(),
+                projectName,
                 task.getTitle(),
                 task.getDescription(),
                 task.getStatus(),
@@ -34,4 +40,3 @@ public record TaskResponse(
         );
     }
 }
-

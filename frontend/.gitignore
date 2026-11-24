@@ -38,8 +38,9 @@ Thumbs.db
 *.sln
 *.sw?
 
-# Environment variables (preserve .env.example)
+# Environment variables (preserve example files)
 .env
 .env.*
 !.env.example
+!.env*.example
 *.env.local

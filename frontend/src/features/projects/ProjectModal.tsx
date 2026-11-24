@@ -36,9 +36,10 @@ interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   projectToEdit?: Project | null;
+  onSuccess?: (project: Project) => void;
 }
 
-export function ProjectModal({ isOpen, onClose, projectToEdit }: ProjectModalProps) {
+export function ProjectModal({ isOpen, onClose, projectToEdit, onSuccess }: ProjectModalProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const isEditing = !!projectToEdit;
 
@@ -94,11 +95,20 @@ export function ProjectModal({ isOpen, onClose, projectToEdit }: ProjectModalPro
       };
 
       if (isEditing && projectToEdit) {
-        await updateMutation.mutateAsync({ id: projectToEdit.id, payload });
+        const updated = await updateMutation.mutateAsync({ id: projectToEdit.id, payload });
+        if (onSuccess) {
+          onSuccess(updated);
+        } else {
+          onClose();
+        }
       } else {
-        await createMutation.mutateAsync(payload);
+        const created = await createMutation.mutateAsync(payload);
+        if (onSuccess) {
+          onSuccess(created);
+        } else {
+          onClose();
+        }
       }
-      onClose();
     } catch (err) {
       if (err instanceof Error) {
         setErrorMsg(err.message);

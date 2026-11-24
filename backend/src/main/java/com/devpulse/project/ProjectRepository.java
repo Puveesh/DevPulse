@@ -3,6 +3,7 @@ package com.devpulse.project;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,6 +23,10 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     Page<Project> findByUserIdAndStatus(UUID userId, ProjectStatus status, Pageable pageable);
 
+    @Modifying
+    @Query("DELETE FROM Project p WHERE p.userId = :userId")
+    void deleteByUserId(@Param("userId") UUID userId);
+
     @Query("SELECT p FROM Project p WHERE p.userId = :userId AND " +
            "(:status IS NULL OR p.status = :status) AND " +
            "(:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
@@ -37,4 +42,3 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     long countByUserId(UUID userId);
 }
-

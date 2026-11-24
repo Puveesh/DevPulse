@@ -15,6 +15,7 @@ interface AuthContextType {
   updatePreferences: (payload: UpdatePreferencesPayload) => Promise<User>;
   uploadAvatar: (dataUrlOrFile: string | File) => Promise<User>;
   removeAvatar: () => Promise<User>;
+  deleteAccount: (payload: { password: string; confirmation: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -150,6 +151,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const deleteAccount = async (payload: { password: string; confirmation: string }) => {
+    try {
+      await apiClient.delete('/users/account', { data: payload });
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    } finally {
+      setAuthToken(null);
+      setToken(null);
+      setUser(null);
+    }
+  };
+
   const value = {
     user,
     token,
@@ -163,6 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     updatePreferences,
     uploadAvatar,
     removeAvatar,
+    deleteAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

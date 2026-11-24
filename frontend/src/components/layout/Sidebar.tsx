@@ -4,7 +4,6 @@ import {
   FolderKanban,
   Clock,
   BarChart3,
-  Settings,
   Activity,
   Layers,
 } from 'lucide-react';
@@ -16,7 +15,6 @@ export function Sidebar() {
     { name: 'Projects', to: '/projects', icon: FolderKanban },
     { name: 'Work Sessions', to: '/worklogs', icon: Clock },
     { name: 'Analytics', to: '/analytics', icon: BarChart3 },
-    { name: 'Settings', to: '/settings', icon: Settings },
   ];
 
   return (

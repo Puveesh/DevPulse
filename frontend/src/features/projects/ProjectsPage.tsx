@@ -50,14 +50,20 @@ export function ProjectsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
 
   // Auto-open create modal if query parameter ?action=create is present
   useEffect(() => {
     if (searchParams.get('action') === 'create') {
+      const fromParam = searchParams.get('from');
+      if (fromParam === 'dashboard') {
+        setReturnTo('/dashboard');
+      }
       setProjectToEdit(null);
       setIsModalOpen(true);
       // Clean up search param
       searchParams.delete('action');
+      searchParams.delete('from');
       setSearchParams(searchParams, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -67,8 +73,29 @@ export function ProjectsPage() {
     status: statusFilter || undefined,
   });
 
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setProjectToEdit(null);
+    if (returnTo) {
+      const dest = returnTo;
+      setReturnTo(null);
+      navigate(dest);
+    }
+  };
+
+  const handleProjectSuccess = (project: Project) => {
+    setIsModalOpen(false);
+    const wasEditing = !!projectToEdit;
+    setProjectToEdit(null);
+    setReturnTo(null);
+    if (!wasEditing) {
+      navigate(`/projects/${project.id}`);
+    }
+  };
+
   const handleEdit = (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
+    setReturnTo(null);
     setProjectToEdit(project);
     setIsModalOpen(true);
   };
@@ -382,10 +409,8 @@ export function ProjectsPage() {
       {/* Create / Edit Modal */}
       <ProjectModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setProjectToEdit(null);
-        }}
+        onClose={handleCloseModal}
+        onSuccess={handleProjectSuccess}
         projectToEdit={projectToEdit}
       />
 

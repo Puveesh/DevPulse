@@ -1,10 +1,40 @@
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { LogOut, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { LogoutConfirmModal } from '../common/LogoutConfirmModal';
+import { ProjectModal } from '../../features/projects/ProjectModal';
+import { UserOverviewCard } from './UserOverviewCard';
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [isUserOverviewOpen, setIsUserOverviewOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserOverviewOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsUserOverviewOpen(false);
+      }
+    }
+    if (isUserOverviewOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isUserOverviewOpen]);
 
   const getInitials = (name?: string) => {
     if (!name) return 'U';
@@ -17,54 +47,77 @@ export function Navbar() {
   };
 
   return (
-    <header className="h-14 border-b border-zinc-800/80 bg-zinc-950/40 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
-      <div className="flex items-center gap-2.5">
-        <span className="text-xs font-medium text-zinc-300">DevPulse Desktop Client</span>
-        {/* <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-          Desktop Runtime
-        </span> */}
-      </div>
+    <>
+      <header className="h-14 border-b border-zinc-800/80 bg-zinc-950/40 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center gap-2.5">
+          <span className="text-xs font-medium text-zinc-300">DevPulse Desktop Client</span>
+        </div>
 
-      <div className="flex items-center gap-4">
-        {/* Quick action button */}
-        <Link to="/projects?action=create">
-          <Button size="sm" variant="outline" leftIcon={<Plus className="w-3.5 h-3.5" />}>
-            New Project
-          </Button>
-        </Link>
-
-        {/* User profile dropdown / info */}
-        <div className="flex items-center gap-3 pl-2 border-l border-zinc-800">
-          <Link to="/settings" className="flex items-center gap-2 hover:opacity-85 transition-opacity" title="Developer Settings">
-            {user?.profileImage ? (
-              <img
-                src={user.profileImage}
-                alt={user.displayName || 'Developer'}
-                className="w-8 h-8 rounded-full object-cover border border-blue-500/30"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-xs font-semibold text-blue-400">
-                {getInitials(user?.displayName)}
-              </div>
-            )}
-            <div className="hidden sm:block text-left">
-              <p className="text-xs font-medium text-zinc-200 leading-none">{user?.displayName}</p>
-              <p className="text-[10px] text-zinc-400 font-mono mt-0.5 leading-none">{user?.email}</p>
-            </div>
-          </Link>
-
+        <div className="flex items-center gap-4">
+          {/* Quick action button */}
           <Button
             size="sm"
-            variant="ghost"
-            onClick={logout}
-            className="text-zinc-400 hover:text-red-400 hover:bg-red-500/10 p-1.5 h-8 w-8"
-            title="Log out"
+            variant="outline"
+            leftIcon={<Plus className="w-3.5 h-3.5" />}
+            onClick={() => setIsCreateProjectModalOpen(true)}
+            className="cursor-pointer"
           >
-            <LogOut className="w-4 h-4" />
-            <span className="sr-only">Log out</span>
+            New Project
           </Button>
+
+          {/* User profile dropdown / info */}
+          <div className="flex items-center gap-3 pl-2 border-l border-zinc-800">
+            <div ref={userMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsUserOverviewOpen((prev) => !prev)}
+                className="flex items-center gap-2 hover:opacity-85 transition-opacity cursor-pointer p-1 rounded-lg hover:bg-zinc-800/40 focus:outline-hidden focus:ring-1 focus:ring-blue-500/50"
+                title="View user overview"
+                aria-expanded={isUserOverviewOpen}
+                aria-haspopup="dialog"
+              >
+                {user?.profileImage ? (
+                  <img
+                    src={user.profileImage}
+                    alt={user.displayName || 'Developer'}
+                    className="w-8 h-8 rounded-full object-cover border border-blue-500/30"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-xs font-semibold text-blue-400">
+                    {getInitials(user?.displayName)}
+                  </div>
+                )}
+                <div className="hidden sm:block text-left">
+                  <p className="text-xs font-medium text-zinc-200 leading-none">{user?.displayName}</p>
+                </div>
+              </button>
+
+              {isUserOverviewOpen && (
+                <UserOverviewCard
+                  user={user}
+                  onClose={() => setIsUserOverviewOpen(false)}
+                  onOpenLogout={() => {
+                    setIsUserOverviewOpen(false);
+                    setIsLogoutModalOpen(true);
+                  }}
+                />
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      <LogoutConfirmModal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={logout}
+      />
+
+      <ProjectModal
+        isOpen={isCreateProjectModalOpen}
+        onClose={() => setIsCreateProjectModalOpen(false)}
+        onSuccess={(project) => navigate(`/projects/${project.id}`)}
+      />
+    </>
   );
 }

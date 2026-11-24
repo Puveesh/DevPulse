@@ -3,29 +3,62 @@ package com.devpulse.user;
 import com.devpulse.auth.dto.UserResponse;
 import com.devpulse.common.BadRequestException;
 import com.devpulse.common.ResourceNotFoundException;
+import com.devpulse.project.ProjectRepository;
+import com.devpulse.task.TaskRepository;
+import com.devpulse.user.dto.DeleteAccountRequest;
 import com.devpulse.user.dto.UpdatePreferencesRequest;
 import com.devpulse.user.dto.UpdateProfileRequest;
+import com.devpulse.worklog.AttachmentMetadataRepository;
+import com.devpulse.worklog.DailyNoteRepository;
+import com.devpulse.worklog.SessionPauseIntervalRepository;
+import com.devpulse.worklog.WorkSession;
+import com.devpulse.worklog.WorkSessionRepository;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.Base64;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class UserService {
 
-    private static final long MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2 MB
+    private static final long MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5 MB
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
             "image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"
     );
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final ProjectRepository projectRepository;
+    private final TaskRepository taskRepository;
+    private final WorkSessionRepository workSessionRepository;
+    private final SessionPauseIntervalRepository sessionPauseIntervalRepository;
+    private final DailyNoteRepository dailyNoteRepository;
+    private final AttachmentMetadataRepository attachmentMetadataRepository;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            ProjectRepository projectRepository,
+            TaskRepository taskRepository,
+            WorkSessionRepository workSessionRepository,
+            SessionPauseIntervalRepository sessionPauseIntervalRepository,
+            DailyNoteRepository dailyNoteRepository,
+            AttachmentMetadataRepository attachmentMetadataRepository) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.projectRepository = projectRepository;
+        this.taskRepository = taskRepository;
+        this.workSessionRepository = workSessionRepository;
+        this.sessionPauseIntervalRepository = sessionPauseIntervalRepository;
+        this.dailyNoteRepository = dailyNoteRepository;
+        this.attachmentMetadataRepository = attachmentMetadataRepository;
     }
 
     @Transactional(readOnly = true)
@@ -90,9 +123,9 @@ public class UserService {
             throw new BadRequestException("Invalid image format. Expected Base64 data URL starting with 'data:image/'");
         }
 
-        // Limit data URL length to ~3.5MB (approx 2MB binary)
-        if (trimmed.length() > 3_500_000) {
-            throw new BadRequestException("Avatar image file size exceeds the 2MB limit");
+        // Limit data URL length to ~8MB (approx 5MB binary)
+        if (trimmed.length() > 8_000_000) {
+            throw new BadRequestException("Avatar image file size exceeds the 5MB limit");
         }
 
         User user = findUserById(userId);
@@ -108,7 +141,7 @@ public class UserService {
         }
 
         if (file.getSize() > MAX_AVATAR_BYTES) {
-            throw new BadRequestException("Avatar image file size exceeds the 2MB limit");
+            throw new BadRequestException("Avatar image file size exceeds the 5MB limit");
         }
 
         String contentType = file.getContentType();
@@ -137,9 +170,46 @@ public class UserService {
         return UserResponse.fromUser(saved);
     }
 
+    @Transactional
+    public void deleteAccount(UUID userId, DeleteAccountRequest request) {
+        User user = findUserById(userId);
+
+        if (request.password() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new BadRequestException("Incorrect account password. Deletion aborted.");
+        }
+
+        if (request.confirmation() == null || !"DELETE MY ACCOUNT".equals(request.confirmation().trim())) {
+            throw new BadRequestException("Confirmation text must exactly match 'DELETE MY ACCOUNT'.");
+        }
+
+        // 1. Delete session pause intervals for all user sessions
+        List<WorkSession> userSessions = workSessionRepository.findByUserIdOrderByStartedAtDesc(userId, Pageable.unpaged()).getContent();
+        if (!userSessions.isEmpty()) {
+            List<UUID> sessionIds = userSessions.stream().map(WorkSession::getId).toList();
+            sessionPauseIntervalRepository.deleteBySessionIdIn(sessionIds);
+        }
+
+        // 2. Delete daily notes
+        dailyNoteRepository.deleteByUserId(userId);
+
+        // 3. Delete attachments metadata
+        attachmentMetadataRepository.deleteByUserId(userId);
+
+        // 4. Delete work sessions
+        workSessionRepository.deleteByUserId(userId);
+
+        // 5. Delete tasks
+        taskRepository.deleteByUserId(userId);
+
+        // 6. Delete projects
+        projectRepository.deleteByUserId(userId);
+
+        // 7. Delete user
+        userRepository.delete(user);
+    }
+
     private User findUserById(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 }
-

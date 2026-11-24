@@ -22,10 +22,14 @@ import {
   Calendar,
   Clock,
   Sparkles,
+  AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
 import { ProfileAvatarUpload } from './ProfileAvatarUpload';
 import { TagMultiSelect } from './TagMultiSelect';
+import { DeleteAccountModal } from './DeleteAccountModal';
+import { Toast } from '../../components/ui/Toast';
 
 // Standard common timezones
 const COMMON_TIMEZONES = [
@@ -84,13 +88,17 @@ export function SettingsPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingPreferences, setIsEditingPreferences] = useState(false);
 
+  // Modal states for account actions
+  const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
+
   // Loading states
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
 
-  // Status notifications
+  // Status notifications (temporary bottom-right toasts)
   const [statusNotification, setStatusNotification] = useState<{
     type: 'success' | 'error';
+    title?: string;
     message: string;
   } | null>(null);
 
@@ -229,12 +237,14 @@ export function SettingsPage() {
 
       setStatusNotification({
         type: 'success',
-        message: 'Developer profile updated successfully across DevPulse.',
+        title: 'Settings Saved',
+        message: 'Profile changes saved successfully.',
       });
       setIsEditingProfile(false);
     } catch (err: any) {
       setStatusNotification({
         type: 'error',
+        title: 'Error Saving Settings',
         message: err.message || 'Failed to update developer profile.',
       });
     } finally {
@@ -284,12 +294,14 @@ export function SettingsPage() {
 
       setStatusNotification({
         type: 'success',
+        title: 'Settings Saved',
         message: 'Workspace preferences saved successfully.',
       });
       setIsEditingPreferences(false);
     } catch (err: any) {
       setStatusNotification({
         type: 'error',
+        title: 'Error Saving Settings',
         message: err.message || 'Failed to update workspace preferences.',
       });
     } finally {
@@ -333,25 +345,6 @@ export function SettingsPage() {
           Manage your account profile, authentication preferences, and developer workspace settings.
         </p>
       </div>
-
-      {/* Global Status Notification */}
-      {statusNotification && (
-        <Alert
-          variant={statusNotification.type === 'success' ? 'success' : 'error'}
-          title={statusNotification.type === 'success' ? 'Settings Saved' : 'Error'}
-          className="animate-in fade-in slide-in-from-top-1 duration-200"
-        >
-          <div className="flex items-center justify-between">
-            <span>{statusNotification.message}</span>
-            <button
-              onClick={() => setStatusNotification(null)}
-              className="text-xs underline hover:opacity-80 ml-4 cursor-pointer"
-            >
-              Dismiss
-            </button>
-          </div>
-        </Alert>
-      )}
 
       <div className="space-y-6">
         {/* ========================================================================= */}
@@ -415,6 +408,7 @@ export function SettingsPage() {
                   await uploadAvatar(dataUrl);
                   setStatusNotification({
                     type: 'success',
+                    title: 'Settings Saved',
                     message: 'Profile picture updated successfully.',
                   });
                 }}
@@ -422,6 +416,7 @@ export function SettingsPage() {
                   await removeAvatar();
                   setStatusNotification({
                     type: 'success',
+                    title: 'Settings Saved',
                     message: 'Profile picture removed. Initials avatar active.',
                   });
                 }}
@@ -973,7 +968,56 @@ export function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* ========================================================================= */}
+        {/* 5. DANGER ZONE CARD                                                      */}
+        {/* ========================================================================= */}
+        <Card className="border-red-500/30 bg-red-950/10">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400" />
+              <CardTitle className="text-red-400">Danger Zone</CardTitle>
+            </div>
+            <CardDescription>Irreversible and destructive account operations</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-xs">
+            <div className="p-4 rounded-lg border border-red-500/20 bg-red-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <span className="font-semibold text-red-300 block">Permanently Delete Account</span>
+                <p className="text-[11px] text-zinc-400 leading-relaxed max-w-xl">
+                  Permanently erase your developer profile, all projects, task cards, work sessions, pause intervals,
+                  daily notes, and attachments from the database. This action is irreversible.
+                </p>
+              </div>
+              <Button
+                variant="danger"
+                size="sm"
+                leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                onClick={() => setIsDeleteAccountModalOpen(true)}
+                className="shrink-0 bg-red-600 hover:bg-red-500 text-white font-medium"
+              >
+                Delete Account
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Confirmation Modals */}
+      <DeleteAccountModal
+        isOpen={isDeleteAccountModalOpen}
+        onClose={() => setIsDeleteAccountModalOpen(false)}
+      />
+
+      {/* Temporary bottom-right toast notification */}
+      <Toast
+        isOpen={!!statusNotification}
+        type={statusNotification?.type || 'success'}
+        title={statusNotification?.title}
+        message={statusNotification?.message || ''}
+        durationMs={5000}
+        onClose={() => setStatusNotification(null)}
+      />
     </div>
   );
 }

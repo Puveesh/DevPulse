@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { loginSchema, type LoginFormData } from './schemas';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
@@ -13,9 +13,6 @@ export function LoginPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const from = location.state?.from?.pathname || '/dashboard';
 
   const {
     register,
@@ -33,7 +30,7 @@ export function LoginPage() {
     setServerError(null);
     try {
       await login(data);
-      navigate(from, { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       if (err instanceof Error) {
         setServerError(err.message);

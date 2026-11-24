@@ -186,7 +186,7 @@ export const ConsistencySection: React.FC<ConsistencySectionProps> = ({
                             if (!item) {
                               return <div key={`empty-${dIdx}`} className="w-3.5 h-3.5 invisible pointer-events-none" />;
                             }
-                            const sessionsCount = item.projects?.length || (item.durationSeconds > 0 ? 1 : 0);
+                            const sessionsCount = item.sessionCount ?? item.projects?.length ?? (item.durationSeconds > 0 ? 1 : 0);
                             return (
                               <div
                                 key={item.date}

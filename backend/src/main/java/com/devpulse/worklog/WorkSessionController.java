@@ -6,6 +6,7 @@ import com.devpulse.worklog.dto.EndWorkSessionRequest;
 import com.devpulse.worklog.dto.StartWorkSessionRequest;
 import com.devpulse.worklog.dto.UpdateSessionNotesRequest;
 import com.devpulse.worklog.dto.WorkSessionResponse;
+import com.devpulse.worklog.dto.WorkSessionSearchRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -103,6 +104,22 @@ public class WorkSessionController {
             @AuthenticationPrincipal UserPrincipal principal) {
         WorkSessionResponse session = workSessionService.updateSessionNotes(principal.getId(), id, request);
         return ResponseEntity.ok(ApiResponse.success("Session notes updated successfully", session));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Search work sessions", description = "Searches work sessions by title, project, and/or date criteria using OR logic")
+    public ResponseEntity<ApiResponse<Page<WorkSessionResponse>>> searchSessions(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) UUID projectId,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) String timezone,
+            @PageableDefault(size = 50, sort = "startedAt", direction = Sort.Direction.DESC) Pageable pageable,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        WorkSessionSearchRequest request = new WorkSessionSearchRequest(title, projectId, month, year, date, timezone);
+        Page<WorkSessionResponse> sessions = workSessionService.searchSessions(principal.getId(), request, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Work sessions search results retrieved", sessions));
     }
 
     @GetMapping

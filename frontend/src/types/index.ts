@@ -140,6 +140,15 @@ export interface WorkSession {
   updatedAt: string;
 }
 
+export interface WorkSessionSearchParams {
+  title?: string;
+  projectId?: string;
+  month?: number;
+  year?: number;
+  date?: string; // 'YYYY-MM-DD'
+  timezone?: string;
+}
+
 export interface StartWorkSessionPayload {
   projectId: string;
   taskId?: string | null;
@@ -167,6 +176,7 @@ export interface DailyActivity {
   day: string;
   durationSeconds: number;
   projects?: ProjectDuration[];
+  sessionCount?: number;
 }
 
 export interface TodaySession {
@@ -315,6 +325,7 @@ export interface Task {
   id: string;
   userId: string;
   projectId: string;
+  projectName?: string | null;
   title: string;
   description: string | null;
   status: TaskStatus;

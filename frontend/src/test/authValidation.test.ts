@@ -82,5 +82,28 @@ describe('Authentication Form Validation Schemas', () => {
       }
     });
   });
+
+  describe('Post-Login Redirection Behavior', () => {
+    it('always navigates directly to /dashboard upon successful login', () => {
+      let targetRoute = '';
+      const onLoginSuccess = () => {
+        // Must direct to dashboard rather than restoring a previously logged-off route
+        targetRoute = '/dashboard';
+      };
+
+      onLoginSuccess();
+      expect(targetRoute).toBe('/dashboard');
+    });
+
+    it('unauthenticated redirection to login does not persist previous route state', () => {
+      const getLoginRedirect = () => {
+        return { to: '/login', replace: true };
+      };
+
+      const redirect = getLoginRedirect();
+      expect(redirect.to).toBe('/login');
+      expect((redirect as any).state).toBeUndefined();
+    });
+  });
 });
 

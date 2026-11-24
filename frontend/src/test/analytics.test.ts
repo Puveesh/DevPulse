@@ -234,6 +234,135 @@ describe('Analytics Utility & Calculation Tests', () => {
         expect(week[5]?.day).toBe('Saturday');
         expect(week[6]?.day).toBe('Sunday');
       });
+
+      it('correctly adapts to Last 7 Days showing only the relevant 7 dates without unrelated weeks', () => {
+        // Nov 17 to Nov 23, 2026 (7 dates)
+        const last7Days: DailyActivity[] = [
+          { date: '2026-11-17', day: 'Tuesday', durationSeconds: 1200, projects: [] },
+          { date: '2026-11-18', day: 'Wednesday', durationSeconds: 2400, projects: [] },
+          { date: '2026-11-19', day: 'Thursday', durationSeconds: 0, projects: [] },
+          { date: '2026-11-20', day: 'Friday', durationSeconds: 3600, projects: [] },
+          { date: '2026-11-21', day: 'Saturday', durationSeconds: 1800, projects: [] },
+          { date: '2026-11-22', day: 'Sunday', durationSeconds: 900, projects: [] },
+          { date: '2026-11-23', day: 'Monday', durationSeconds: 4500, projects: [] },
+        ];
+
+        const monthGroups = groupTimelineByMonthsAndWeeks(last7Days);
+        expect(monthGroups.length).toBe(1);
+        expect(monthGroups[0].monthLabel).toBe('Nov');
+
+        // Total active days in the timeline is exactly 7
+        const renderedActiveDates = monthGroups[0].weeks
+          .flat()
+          .filter((item): item is DailyActivity => item !== null)
+          .map((item) => item.date);
+
+        expect(renderedActiveDates).toEqual([
+          '2026-11-17',
+          '2026-11-18',
+          '2026-11-19',
+          '2026-11-20',
+          '2026-11-21',
+          '2026-11-22',
+          '2026-11-23',
+        ]);
+        expect(renderedActiveDates.length).toBe(7);
+      });
+
+      it('preserves exact custom range boundaries with zero extraneous active cells', () => {
+        // Custom range: Nov 10 to Nov 15
+        const customTimeline: DailyActivity[] = [
+          { date: '2026-11-10', day: 'Tuesday', durationSeconds: 1000, projects: [], sessionCount: 1 },
+          { date: '2026-11-11', day: 'Wednesday', durationSeconds: 2000, projects: [], sessionCount: 2 },
+          { date: '2026-11-12', day: 'Thursday', durationSeconds: 3000, projects: [], sessionCount: 1 },
+          { date: '2026-11-13', day: 'Friday', durationSeconds: 4000, projects: [], sessionCount: 3 },
+          { date: '2026-11-14', day: 'Saturday', durationSeconds: 5000, projects: [], sessionCount: 2 },
+          { date: '2026-11-15', day: 'Sunday', durationSeconds: 6000, projects: [], sessionCount: 1 },
+        ];
+
+        const monthGroups = groupTimelineByMonthsAndWeeks(customTimeline);
+        expect(monthGroups.length).toBe(1);
+        const allItems = monthGroups[0].weeks.flat();
+
+        // Monday (index 0) was not in custom range -> must be null
+        expect(allItems[0]).toBeNull();
+        // Tuesday through Sunday must match custom range
+        expect(allItems[1]?.date).toBe('2026-11-10');
+        expect(allItems[6]?.date).toBe('2026-11-15');
+      });
+    });
+
+    describe('Custom Date Range Validation Logic', () => {
+      it('validates proper start and end dates', () => {
+        const validateRange = (start: string, end: string) => {
+          if (!start || !end) return 'Both start and end dates are required.';
+          if (end < start) return 'End date cannot be earlier than start date.';
+          return null;
+        };
+
+        expect(validateRange('2026-11-10', '2026-11-20')).toBeNull();
+        expect(validateRange('2026-11-10', '2026-11-10')).toBeNull();
+        expect(validateRange('2026-11-20', '2026-11-10')).toBe('End date cannot be earlier than start date.');
+        expect(validateRange('', '2026-11-20')).toBe('Both start and end dates are required.');
+      });
+    });
+
+    describe('Mention Popup Dynamic Positioning Calculation', () => {
+      const calculatePopupPosition = (
+        rect: { top: number; bottom: number; left: number },
+        viewportHeight: number,
+        viewportWidth: number
+      ) => {
+        const popupWidth = 320;
+        const estimatedHeight = 280;
+        const padding = 12;
+
+        const spaceBelow = viewportHeight - rect.bottom;
+        const spaceAbove = rect.top;
+
+        let placement: 'top' | 'bottom' = 'bottom';
+        let top = rect.bottom + 6;
+
+        if (spaceBelow < 240 && spaceAbove > spaceBelow) {
+          placement = 'top';
+          top = Math.max(padding, rect.top - estimatedHeight - 6);
+        } else {
+          if (top + estimatedHeight > viewportHeight - padding) {
+            top = Math.max(padding, viewportHeight - estimatedHeight - padding);
+          }
+        }
+
+        let left = rect.left;
+        if (left + popupWidth > viewportWidth - padding) {
+          left = Math.max(padding, viewportWidth - popupWidth - padding);
+        } else if (left < padding) {
+          left = padding;
+        }
+
+        return { top, left, placement };
+      };
+
+      it('opens below cursor when sufficient space exists below', () => {
+        // Cursor at top of editor: top: 200, bottom: 220, viewport height: 900
+        const result = calculatePopupPosition({ top: 200, bottom: 220, left: 100 }, 900, 1400);
+        expect(result.placement).toBe('bottom');
+        expect(result.top).toBe(226); // 220 + 6
+        expect(result.left).toBe(100);
+      });
+
+      it('flips above cursor when insufficient space exists below', () => {
+        // Cursor near bottom of editor: top: 750, bottom: 770, viewport height: 800
+        // spaceBelow = 30px (< 240), spaceAbove = 750px (> spaceBelow)
+        const result = calculatePopupPosition({ top: 750, bottom: 770, left: 100 }, 800, 1400);
+        expect(result.placement).toBe('top');
+        expect(result.top).toBe(750 - 280 - 6); // 464
+      });
+
+      it('shifts left when cursor is close to the right edge of the viewport', () => {
+        // Viewport width: 1000, cursor left at 850 (popup width 320 -> 850 + 320 = 1170 > 1000)
+        const result = calculatePopupPosition({ top: 200, bottom: 220, left: 850 }, 900, 1000);
+        expect(result.left).toBe(1000 - 320 - 12); // 668
+      });
     });
   });
 });

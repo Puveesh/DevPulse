@@ -5,18 +5,28 @@ import com.devpulse.common.ConflictException;
 import com.devpulse.common.ResourceNotFoundException;
 import com.devpulse.project.Project;
 import com.devpulse.project.ProjectRepository;
+import com.devpulse.user.UserRepository;
 import com.devpulse.worklog.dto.EndWorkSessionRequest;
 import com.devpulse.worklog.dto.PauseIntervalDto;
 import com.devpulse.worklog.dto.StartWorkSessionRequest;
 import com.devpulse.worklog.dto.UpdateSessionNotesRequest;
 import com.devpulse.worklog.dto.WorkSessionResponse;
+import com.devpulse.worklog.dto.WorkSessionSearchRequest;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,13 +41,16 @@ public class WorkSessionService {
     private final WorkSessionRepository workSessionRepository;
     private final SessionPauseIntervalRepository pauseIntervalRepository;
     private final ProjectRepository projectRepository;
+    private final UserRepository userRepository;
 
     public WorkSessionService(WorkSessionRepository workSessionRepository,
                               SessionPauseIntervalRepository pauseIntervalRepository,
-                              ProjectRepository projectRepository) {
+                              ProjectRepository projectRepository,
+                              UserRepository userRepository) {
         this.workSessionRepository = workSessionRepository;
         this.pauseIntervalRepository = pauseIntervalRepository;
         this.projectRepository = projectRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -257,6 +270,175 @@ public class WorkSessionService {
             String projectName = s.getProjectId() != null ? projectNames.get(s.getProjectId()) : null;
             return WorkSessionResponse.fromSession(s, projectName, s.getTotalDurationSeconds(), List.of());
         });
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WorkSessionResponse> searchSessions(UUID userId, WorkSessionSearchRequest request, Pageable pageable) {
+        if (request == null || !request.hasAnyFilter()) {
+            return getSessions(userId, null, pageable);
+        }
+
+        ZoneId zone = resolveZone(request.timezone(), userId);
+        Instant now = Instant.now();
+
+        // 1. Determine date range boundaries based on precedence rules
+        Instant windowStart = null;
+        Instant windowEnd = null;
+        boolean hasDateWindow = false;
+        boolean hasMonthWithoutYear = false;
+
+        if (request.hasDate()) {
+            // Case 1: Specific Date selection (Precedence 1)
+            if (request.date() != null && !request.date().trim().isBlank()) {
+                try {
+                    LocalDate specificDate = LocalDate.parse(request.date().trim());
+                    if (request.year() != null && request.year() != specificDate.getYear()) {
+                        specificDate = specificDate.withYear(request.year());
+                    }
+                    windowStart = specificDate.atStartOfDay(zone).toInstant();
+                    windowEnd = specificDate.plusDays(1).atStartOfDay(zone).toInstant();
+                    hasDateWindow = true;
+                } catch (Exception ignored) {
+                }
+            } else if (request.month() != null && request.month() >= 1 && request.month() <= 12) {
+                // Case 2: Month selection (Precedence 2)
+                if (request.year() != null) {
+                    YearMonth ym = YearMonth.of(request.year(), request.month());
+                    windowStart = ym.atDay(1).atStartOfDay(zone).toInstant();
+                    windowEnd = ym.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant();
+                    hasDateWindow = true;
+                } else {
+                    hasMonthWithoutYear = true;
+                }
+            } else if (request.year() != null) {
+                // Case 3: Year selection independently (Precedence 3)
+                windowStart = LocalDate.of(request.year(), 1, 1).atStartOfDay(zone).toInstant();
+                windowEnd = LocalDate.of(request.year() + 1, 1, 1).atStartOfDay(zone).toInstant();
+                hasDateWindow = true;
+            }
+        }
+
+        final Instant fWindowStart = windowStart;
+        final Instant fWindowEnd = windowEnd;
+        final boolean fHasDateWindow = hasDateWindow;
+        final boolean fHasMonthWithoutYear = hasMonthWithoutYear;
+        final Integer fMonth = request.month();
+
+        // 2. Build dynamic Specification combining search criteria with pure OR logic,
+        // and strictly enforcing authenticated user constraint outside the OR group
+        Specification<WorkSession> spec = (root, query, cb) -> {
+            List<Predicate> orPredicates = new ArrayList<>();
+
+            if (request.hasTitle()) {
+                String pattern = "%" + request.title().trim().toLowerCase() + "%";
+                orPredicates.add(cb.like(cb.lower(cb.trim(root.get("title"))), pattern));
+            }
+
+            if (request.hasProject()) {
+                orPredicates.add(cb.equal(root.get("projectId"), request.projectId()));
+            }
+
+            if (fHasDateWindow && fWindowStart != null && fWindowEnd != null) {
+                Predicate startedBeforeEnd = cb.lessThan(root.get("startedAt"), fWindowEnd);
+                Predicate endedAfterStart = cb.or(
+                        cb.isNull(root.get("endedAt")),
+                        cb.greaterThanOrEqualTo(root.get("endedAt"), fWindowStart)
+                );
+                orPredicates.add(cb.and(startedBeforeEnd, endedAfterStart));
+            } else if (fHasMonthWithoutYear && fMonth != null) {
+                orPredicates.add(cb.equal(cb.function("month", Integer.class, root.get("startedAt")), fMonth));
+            }
+
+            Predicate userPredicate = cb.equal(root.get("userId"), userId);
+
+            if (orPredicates.isEmpty()) {
+                return userPredicate;
+            }
+
+            return cb.and(userPredicate, cb.or(orPredicates.toArray(new Predicate[0])));
+        };
+
+        // 3. Query candidate sessions
+        Sort sort = (pageable.getSort() != null && pageable.getSort().isSorted())
+                ? pageable.getSort()
+                : Sort.by(Sort.Direction.DESC, "startedAt");
+
+        List<WorkSession> candidateSessions = workSessionRepository.findAll(spec, sort);
+
+        // 4. Verify working time for date-matched sessions (excluding pause intervals, handling midnight crossing)
+        List<WorkSession> matchedSessions;
+        if (fHasDateWindow && fWindowStart != null && fWindowEnd != null) {
+            List<UUID> sessionIds = candidateSessions.stream().map(WorkSession::getId).toList();
+            List<SessionPauseInterval> pauses = sessionIds.isEmpty()
+                    ? List.of()
+                    : pauseIntervalRepository.findBySessionIdInOrderByPausedAtAsc(sessionIds);
+            Map<UUID, List<SessionPauseInterval>> pausesBySession = pauses.stream()
+                    .collect(Collectors.groupingBy(SessionPauseInterval::getSessionId));
+
+            matchedSessions = new ArrayList<>();
+            for (WorkSession session : candidateSessions) {
+                boolean titleMatch = request.hasTitle()
+                        && session.getTitle() != null
+                        && session.getTitle().toLowerCase().contains(request.title().trim().toLowerCase());
+                boolean projectMatch = request.hasProject()
+                        && Objects.equals(session.getProjectId(), request.projectId());
+
+                if (titleMatch || projectMatch) {
+                    matchedSessions.add(session);
+                } else {
+                    List<SessionPauseInterval> sessionPauses = pausesBySession.getOrDefault(session.getId(), List.of());
+                    long workingInWindow = com.devpulse.analytics.AnalyticsService.calculateWorkingSecondsInWindow(
+                            session.getStartedAt(),
+                            session.getEndedAt(),
+                            sessionPauses,
+                            fWindowStart,
+                            fWindowEnd,
+                            now
+                    );
+                    if (workingInWindow > 0) {
+                        matchedSessions.add(session);
+                    }
+                }
+            }
+        } else {
+            matchedSessions = candidateSessions;
+        }
+
+        // 5. Apply pagination over verified matches
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), matchedSessions.size());
+        List<WorkSession> pagedSessions = (start < matchedSessions.size())
+                ? matchedSessions.subList(start, end)
+                : List.of();
+
+        // 6. Fetch project names in batch to avoid N+1 queries
+        Map<UUID, String> projectNames = fetchProjectNames(pagedSessions, userId);
+
+        List<WorkSessionResponse> dtos = pagedSessions.stream().map(s -> {
+            String projectName = s.getProjectId() != null ? projectNames.get(s.getProjectId()) : null;
+            return WorkSessionResponse.fromSession(s, projectName, s.getTotalDurationSeconds(), List.of());
+        }).toList();
+
+        return new PageImpl<>(dtos, pageable, matchedSessions.size());
+    }
+
+    private ZoneId resolveZone(String timezone, UUID userId) {
+        if (timezone != null && !timezone.isBlank()) {
+            try {
+                return ZoneId.of(timezone.trim());
+            } catch (Exception ignored) {
+            }
+        }
+        if (userId != null && userRepository != null) {
+            try {
+                Optional<com.devpulse.user.User> user = userRepository.findById(userId);
+                if (user.isPresent() && user.get().getTimezone() != null && !user.get().getTimezone().isBlank()) {
+                    return ZoneId.of(user.get().getTimezone().trim());
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return ZoneOffset.UTC;
     }
 
     public long calculateWorkingDurationSeconds(WorkSession session, List<SessionPauseInterval> pauseIntervals, Instant asOf) {

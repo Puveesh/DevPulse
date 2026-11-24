@@ -7,6 +7,7 @@ import type {
   UpdateSessionNotesPayload,
   ApiResponse,
   PageResponse,
+  WorkSessionSearchParams,
 } from '../types';
 
 export function useActiveSession() {
@@ -56,6 +57,68 @@ export function useWorkSessions(page = 0, size = 20, projectId?: string) {
       }
     },
     staleTime: 1000 * 10,
+  });
+}
+
+export function useSearchWorkSessions(params: WorkSessionSearchParams, page = 0, size = 50) {
+  const hasTitle = Boolean(params.title && params.title.trim());
+  const hasProject = Boolean(params.projectId && params.projectId.trim());
+  const hasDate = Boolean(params.date && params.date.trim());
+  const hasMonth = Boolean(params.month !== undefined && params.month >= 1 && params.month <= 12);
+  const hasYear = Boolean(params.year !== undefined);
+
+  const hasAnyFilter = hasTitle || hasProject || hasDate || hasMonth || hasYear;
+
+  return useQuery({
+    queryKey: ['work-sessions', 'search', params, page, size, hasAnyFilter],
+    queryFn: async () => {
+      try {
+        const queryParams = new URLSearchParams({
+          page: String(page),
+          size: String(size),
+        });
+
+        if (hasAnyFilter) {
+          if (hasTitle && params.title) queryParams.append('title', params.title.trim());
+          if (hasProject && params.projectId) queryParams.append('projectId', params.projectId.trim());
+          if (hasMonth && params.month) queryParams.append('month', String(params.month));
+          if (hasYear && params.year) queryParams.append('year', String(params.year));
+          if (hasDate && params.date) queryParams.append('date', params.date.trim());
+
+          const tz =
+            params.timezone ||
+            (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC');
+          if (tz) queryParams.append('timezone', tz);
+
+          const res = await apiClient.get<ApiResponse<PageResponse<WorkSession> | WorkSession[]>>(
+            `/work-sessions/search?${queryParams.toString()}`
+          );
+          const data = res.data.data;
+          if (Array.isArray(data)) {
+            return { content: data, totalElements: data.length };
+          }
+          return {
+            content: data.content || [],
+            totalElements: data.page?.totalElements ?? data.content?.length ?? 0,
+          };
+        } else {
+          const res = await apiClient.get<ApiResponse<PageResponse<WorkSession> | WorkSession[]>>(
+            `/work-sessions?${queryParams.toString()}`
+          );
+          const data = res.data.data;
+          if (Array.isArray(data)) {
+            return { content: data, totalElements: data.length };
+          }
+          return {
+            content: data.content || [],
+            totalElements: data.page?.totalElements ?? data.content?.length ?? 0,
+          };
+        }
+      } catch {
+        return { content: [], totalElements: 0 };
+      }
+    },
+    staleTime: 1000 * 5,
   });
 }
 

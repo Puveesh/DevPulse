@@ -30,6 +30,7 @@ import { WeeklyStatisticsModal } from './WeeklyStatisticsModal';
 import { TodayWorklogModal } from './TodayWorklogModal';
 import { ProjectTaskOverview } from './ProjectTaskOverview';
 import { SelectProjectModal } from './SelectProjectModal';
+import { ProjectModal } from '../projects/ProjectModal';
 import type { WorkSession } from '../../types';
 
 export function DashboardPage() {
@@ -54,8 +55,13 @@ export function DashboardPage() {
   const [isWeeklyStatsModalOpen, setIsWeeklyStatsModalOpen] = useState(false);
   const [isTodayWorklogModalOpen, setIsTodayWorklogModalOpen] = useState(false);
   const [isSelectProjectModalOpen, setIsSelectProjectModalOpen] = useState(false);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
 
-  const activeProjects = projects?.filter((p) => p.status === 'ACTIVE') || [];
+  const activeProjects = useMemo(() => {
+    return (projects?.filter((p) => p.status === 'ACTIVE') || []).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [projects]);
   const activeCount = activeProjects.length;
   const completedSessions = (sessionsData?.content || []).filter((s) => s.status === 'COMPLETED');
 
@@ -315,12 +321,14 @@ export function DashboardPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-zinc-200">Your Active Projects</h2>
-              <Link
-                to="/projects"
-                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium"
-              >
-                View all <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+              {activeProjects.length > 3 && (
+                <Link
+                  to="/projects"
+                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium"
+                >
+                  View all <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              )}
             </div>
 
             {isLoading ? (
@@ -330,7 +338,7 @@ export function DashboardPage() {
               </div>
             ) : activeProjects.length > 0 ? (
               <div className="space-y-3">
-                {activeProjects.slice(0, 4).map((project) => (
+                {activeProjects.slice(0, 3).map((project) => (
                   <div
                     key={project.id}
                     onClick={() => navigate(`/projects/${project.id}`)}
@@ -378,7 +386,7 @@ export function DashboardPage() {
                 title="No active projects"
                 description="Create your first development project to start tracking your codebase progress."
                 actionText="Create Project"
-                onAction={() => navigate('/projects?action=create')}
+                onAction={() => setIsCreateProjectModalOpen(true)}
               />
             )}
           </div>
@@ -398,9 +406,9 @@ export function DashboardPage() {
             <CardContent className="space-y-2">
               <Button
                 variant="outline"
-                className="w-full justify-start text-xs font-medium"
+                className="w-full justify-start text-xs font-medium cursor-pointer"
                 leftIcon={<Plus className="w-4 h-4 text-blue-400 mr-1" />}
-                onClick={() => navigate('/projects?action=create')}
+                onClick={() => setIsCreateProjectModalOpen(true)}
               >
                 Create New Project
               </Button>
@@ -498,13 +506,25 @@ export function DashboardPage() {
           {/* Recent Work Sessions */}
           <Card>
             <CardHeader>
-              <CardTitle>Recent Work Sessions</CardTitle>
-              <CardDescription>Dev tracking history</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Recent Work Sessions</CardTitle>
+                  <CardDescription>Dev tracking history</CardDescription>
+                </div>
+                {completedSessions.length > 3 && (
+                  <Link
+                    to="/work-sessions"
+                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 font-medium"
+                  >
+                    View all <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {completedSessions.length > 0 ? (
                 <div className="space-y-2.5">
-                  {completedSessions.slice(0, 4).map((session) => (
+                  {completedSessions.slice(0, 3).map((session) => (
                     <div
                       key={session.id}
                       onClick={() => setSelectedDetailSession(session)}
@@ -561,6 +581,13 @@ export function DashboardPage() {
       <SelectProjectModal
         isOpen={isSelectProjectModalOpen}
         onClose={() => setIsSelectProjectModalOpen(false)}
+      />
+
+      {/* Create Project Modal */}
+      <ProjectModal
+        isOpen={isCreateProjectModalOpen}
+        onClose={() => setIsCreateProjectModalOpen(false)}
+        onSuccess={(project) => navigate(`/projects/${project.id}`)}
       />
     </div>
   );

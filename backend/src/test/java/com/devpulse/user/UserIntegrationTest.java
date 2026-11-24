@@ -200,4 +200,58 @@ class UserIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success", is(false)));
     }
+
+    @Test
+    void testDeleteAccount_Success() throws Exception {
+        String token = registerAndGetToken("delete-me@devpulse.io", "To Be Deleted");
+        User user = userRepository.findByEmail("delete-me@devpulse.io").orElseThrow();
+
+        com.devpulse.user.dto.DeleteAccountRequest req = new com.devpulse.user.dto.DeleteAccountRequest(
+                "StrongPass123!",
+                "DELETE MY ACCOUNT"
+        );
+
+        mockMvc.perform(delete("/api/v1/users/account")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)));
+
+        org.junit.jupiter.api.Assertions.assertTrue(userRepository.findById(user.getId()).isEmpty());
+    }
+
+    @Test
+    void testDeleteAccount_WrongPasswordFails() throws Exception {
+        String token = registerAndGetToken("wrong-pass@devpulse.io", "Wrong Pass");
+
+        com.devpulse.user.dto.DeleteAccountRequest req = new com.devpulse.user.dto.DeleteAccountRequest(
+                "IncorrectPassword!",
+                "DELETE MY ACCOUNT"
+        );
+
+        mockMvc.perform(delete("/api/v1/users/account")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success", is(false)));
+    }
+
+    @Test
+    void testDeleteAccount_InvalidConfirmationPhraseFails() throws Exception {
+        String token = registerAndGetToken("wrong-confirm@devpulse.io", "Wrong Confirm");
+
+        com.devpulse.user.dto.DeleteAccountRequest req = new com.devpulse.user.dto.DeleteAccountRequest(
+                "StrongPass123!",
+                "delete"
+        );
+
+        mockMvc.perform(delete("/api/v1/users/account")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success", is(false)));
+    }
 }

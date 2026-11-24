@@ -4,6 +4,7 @@ import com.devpulse.auth.dto.UserResponse;
 import com.devpulse.common.ApiResponse;
 import com.devpulse.security.UserPrincipal;
 import com.devpulse.user.dto.AvatarUploadRequest;
+import com.devpulse.user.dto.DeleteAccountRequest;
 import com.devpulse.user.dto.UpdatePreferencesRequest;
 import com.devpulse.user.dto.UpdateProfileRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,7 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/users")
-@Tag(name = "Developer Profile", description = "Endpoints for managing developer profile, preferences, and avatar")
+@Tag(name = "Developer Profile", description = "Endpoints for managing developer profile, preferences, avatar, and account deletion")
 public class UserController {
 
     private final UserService userService;
@@ -82,5 +83,13 @@ public class UserController {
         UserResponse response = userService.removeAvatar(principal.getId());
         return ResponseEntity.ok(ApiResponse.success("Profile avatar removed successfully", response));
     }
-}
 
+    @DeleteMapping("/account")
+    @Operation(summary = "Permanently delete account", description = "Permanently deletes the authenticated developer account and all associated workspace records")
+    public ResponseEntity<ApiResponse<Void>> deleteAccount(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody DeleteAccountRequest request) {
+        userService.deleteAccount(principal.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success("Account and all associated records permanently deleted", null));
+    }
+}

@@ -100,7 +100,7 @@ export function SelectProjectModal({
                 leftIcon={<FolderPlus className="w-4 h-4" />}
                 onClick={() => {
                   handleClose();
-                  navigate('/projects?action=create');
+                  navigate('/projects?action=create&from=dashboard');
                 }}
               >
                 Create New Project

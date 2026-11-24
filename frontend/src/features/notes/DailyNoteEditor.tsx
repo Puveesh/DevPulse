@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -135,6 +136,11 @@ export function DailyNoteEditor({
     command: (item: MentionItem) => void;
   } | null>(null);
 
+  const suggestionStateRef = useRef(suggestionState);
+  suggestionStateRef.current = suggestionState;
+
+  const clientRectFnRef = useRef<(() => DOMRect | null) | null>(null);
+
   // Build searchable items pool from existing project tasks and work sessions
   const taskItems: MentionItem[] = tasks.map((t) => ({
     id: t.id,
@@ -225,6 +231,7 @@ export function DailyNoteEditor({
           render: () => {
             return {
               onStart: (props) => {
+                clientRectFnRef.current = props.clientRect || null;
                 const rect = props.clientRect ? props.clientRect() : null;
                 setSuggestionState({
                   isOpen: true,
@@ -244,6 +251,7 @@ export function DailyNoteEditor({
                 });
               },
               onUpdate: (props) => {
+                clientRectFnRef.current = props.clientRect || null;
                 const rect = props.clientRect ? props.clientRect() : null;
                 setSuggestionState((prev) =>
                   prev
@@ -258,7 +266,9 @@ export function DailyNoteEditor({
                 );
               },
               onKeyDown: (props) => {
-                if (!suggestionState || !suggestionState.items.length) return false;
+                const current = suggestionStateRef.current;
+                if (!current || !current.items.length) return false;
+
                 if (props.event.key === 'ArrowDown') {
                   setSuggestionState((prev) =>
                     prev
@@ -283,9 +293,9 @@ export function DailyNoteEditor({
                   return true;
                 }
                 if (props.event.key === 'Enter') {
-                  const selected = suggestionState.items[suggestionState.selectedIndex];
+                  const selected = current.items[current.selectedIndex];
                   if (selected) {
-                    suggestionState.command(selected);
+                    current.command(selected);
                     setSuggestionState(null);
                     return true;
                   }
@@ -297,6 +307,7 @@ export function DailyNoteEditor({
                 return false;
               },
               onExit: () => {
+                clientRectFnRef.current = null;
                 setSuggestionState(null);
               },
             };
@@ -339,6 +350,80 @@ export function DailyNoteEditor({
       }
     }
   };
+
+  // Dynamic positioning calculation for the mention suggestion popup
+  const popupPosition = useMemo(() => {
+    if (!suggestionState?.rect) {
+      return { top: 120, left: 24, placement: 'bottom' as const };
+    }
+
+    const rect = suggestionState.rect;
+    const popupWidth = 320;
+    const estimatedHeight = 280;
+    const padding = 12;
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    let placement: 'top' | 'bottom' = 'bottom';
+    let top = rect.bottom + 6;
+
+    // If insufficient space exists below (< 240px) and more space exists above, flip above cursor
+    if (spaceBelow < 240 && spaceAbove > spaceBelow) {
+      placement = 'top';
+      top = Math.max(padding, rect.top - estimatedHeight - 6);
+    } else {
+      // Opening below: if it would overflow bottom edge of viewport, clamp it
+      if (top + estimatedHeight > window.innerHeight - padding) {
+        top = Math.max(padding, window.innerHeight - estimatedHeight - padding);
+      }
+    }
+
+    // Horizontal positioning: align with cursor, clamp so it remains fully inside viewport
+    let left = rect.left;
+    if (left + popupWidth > window.innerWidth - padding) {
+      left = Math.max(padding, window.innerWidth - popupWidth - padding);
+    } else if (left < padding) {
+      left = padding;
+    }
+
+    return { top, left, placement };
+  }, [suggestionState?.rect]);
+
+  // Recalculate popup position on window resize, scroll, or click outside
+  useEffect(() => {
+    if (!suggestionState?.isOpen) return;
+
+    const handleScrollOrResize = () => {
+      if (clientRectFnRef.current) {
+        const newRect = clientRectFnRef.current();
+        if (newRect) {
+          setSuggestionState((prev) => (prev ? { ...prev, rect: newRect } : null));
+        }
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const popupEl = document.getElementById('daily-note-mention-popup');
+      if (
+        popupEl &&
+        !popupEl.contains(e.target as Node) &&
+        !editorRef.current?.contains(e.target as Node)
+      ) {
+        setSuggestionState(null);
+      }
+    };
+
+    window.addEventListener('resize', handleScrollOrResize);
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [suggestionState?.isOpen]);
 
   if (!editor) {
     return (
@@ -581,15 +666,14 @@ export function DailyNoteEditor({
         <EditorContent editor={editor} />
       </div>
 
-      {/* Mention Suggestion Popup */}
-      {suggestionState && suggestionState.isOpen && (
+      {/* Mention Suggestion Popup (Portalled to document.body to prevent clipping by overflow-hidden or containers) */}
+      {suggestionState && suggestionState.isOpen && createPortal(
         <div
+          id="daily-note-mention-popup"
           style={{
             position: 'fixed',
-            top: suggestionState.rect ? suggestionState.rect.bottom + 6 : 100,
-            left: suggestionState.rect
-              ? Math.max(10, Math.min(suggestionState.rect.left, window.innerWidth - 340))
-              : 100,
+            top: popupPosition.top,
+            left: popupPosition.left,
             zIndex: 9999,
           }}
           className="w-80 max-h-72 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl p-1.5 text-xs text-zinc-200 animate-in fade-in zoom-in-95 duration-150"
@@ -686,7 +770,8 @@ export function DailyNoteEditor({
               )}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

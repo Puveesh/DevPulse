@@ -44,6 +44,7 @@ export function AnalyticsPage() {
   const handleCustomRangeChange = (start: string, end: string) => {
     setCustomStart(start);
     setCustomEnd(end);
+    setPreset('CUSTOM');
   };
 
   return (

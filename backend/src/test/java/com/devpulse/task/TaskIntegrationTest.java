@@ -214,5 +214,27 @@ class TaskIntegrationTest {
                 .andExpect(jsonPath("$.data.projects[?(@.projectName == 'EduTrust')].pendingTaskCount").value(3))
                 .andExpect(jsonPath("$.data.projects[?(@.projectName == 'Weather App')].pendingTaskCount").value(0));
     }
+
+    @Test
+    void testGetRecentTasks_ReturnsOrderedTasksWithProjectName() throws Exception {
+        String token = registerAndGetToken("eve@devpulse.com", "Eve Recent");
+        User user = userRepository.findByEmail("eve@devpulse.com").orElseThrow();
+
+        Project project = projectRepository.save(new Project(
+                user.getId(), "Quantum Hub", "Quantum simulations", null, null, ProjectStatus.ACTIVE
+        ));
+
+        taskRepository.save(new Task(user.getId(), project.getId(), "Task Alpha", null, TaskStatus.TODO, TaskPriority.LOW, null));
+        taskRepository.save(new Task(user.getId(), project.getId(), "Task Beta", null, TaskStatus.IN_PROGRESS, TaskPriority.MEDIUM, null));
+        taskRepository.save(new Task(user.getId(), project.getId(), "Task Gamma", null, TaskStatus.COMPLETED, TaskPriority.HIGH, null));
+        taskRepository.save(new Task(user.getId(), project.getId(), "Task Delta", null, TaskStatus.TODO, TaskPriority.URGENT, null));
+
+        mockMvc.perform(get("/api/v1/tasks/recent?limit=3")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data", hasSize(3)))
+                .andExpect(jsonPath("$.data[0].projectName", is("Quantum Hub")));
+    }
 }
 

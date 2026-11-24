@@ -1,0 +1,12 @@
+.git
+.gitignore
+node_modules
+frontend
+dist
+dist-electron
+out
+*.md
+.idea
+.vscode
+*.log
+backend/target

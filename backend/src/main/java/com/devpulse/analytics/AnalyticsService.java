@@ -229,6 +229,7 @@ public class AnalyticsService {
 
             long dayWorkingSeconds = 0L;
             Map<UUID, Long> dayProjectDurations = new HashMap<>();
+            int daySessionCount = 0;
 
             for (WorkSession session : sessions) {
                 List<SessionPauseInterval> pauses = pausesBySession.getOrDefault(session.getId(), List.of());
@@ -243,6 +244,7 @@ public class AnalyticsService {
 
                 if (workingInDay > 0) {
                     dayWorkingSeconds += workingInDay;
+                    daySessionCount++;
                     if (session.getProjectId() != null) {
                         dayProjectDurations.merge(session.getProjectId(), workingInDay, Long::sum);
                         activeProjectIdsInWeek.add(session.getProjectId());
@@ -259,7 +261,7 @@ public class AnalyticsService {
                     .sorted(Comparator.comparingLong(ProjectDurationDto::durationSeconds).reversed())
                     .toList();
 
-            dailyList.add(new DailyActivityDto(currentDay.toString(), dayName, dayWorkingSeconds, dayProjectList));
+            dailyList.add(new DailyActivityDto(currentDay.toString(), dayName, dayWorkingSeconds, dayProjectList, daySessionCount));
             totalWeeklySeconds += dayWorkingSeconds;
 
             if (dayWorkingSeconds > 0) {
@@ -333,23 +335,20 @@ public class AnalyticsService {
             case "LAST_90_DAYS" -> startDate = today.minusDays(89);
             case "THIS_WEEK" -> {
                 startDate = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-                endDate = today;
+                endDate = startDate.plusDays(6);
             }
             case "THIS_MONTH" -> {
                 startDate = today.withDayOfMonth(1);
-                endDate = today;
+                endDate = today.with(TemporalAdjusters.lastDayOfMonth());
             }
             case "THIS_YEAR" -> {
                 startDate = today.withDayOfYear(1);
-                endDate = today;
+                endDate = today.with(TemporalAdjusters.lastDayOfYear());
             }
             case "ALL_TIME" -> {
-                Optional<Instant> earliestActivity = workSessionRepository.findByUserIdOrderByStartedAtDesc(userId, org.springframework.data.domain.PageRequest.of(0, 100))
-                        .getContent().stream()
-                        .map(WorkSession::getStartedAt)
-                        .min(Comparator.naturalOrder());
-                startDate = earliestActivity
-                        .map(instant -> LocalDate.ofInstant(instant, zone))
+                Optional<WorkSession> earliestSession = workSessionRepository.findFirstByUserIdOrderByStartedAtAsc(userId);
+                startDate = earliestSession
+                        .map(ws -> LocalDate.ofInstant(ws.getStartedAt(), zone))
                         .orElse(today.minusYears(1));
                 endDate = today;
             }
@@ -433,6 +432,7 @@ public class AnalyticsService {
 
             long dayWorkingSeconds = 0L;
             Map<UUID, Long> dayProjectDurations = new HashMap<>();
+            int daySessionCount = 0;
 
             for (WorkSession session : windowSessions) {
                 List<SessionPauseInterval> pauses = pausesBySession.getOrDefault(session.getId(), List.of());
@@ -447,6 +447,7 @@ public class AnalyticsService {
 
                 if (workingInDay > 0) {
                     dayWorkingSeconds += workingInDay;
+                    daySessionCount++;
                     touchedSessionsInPeriod.add(session.getId());
 
                     if (session.getProjectId() != null) {
@@ -479,7 +480,7 @@ public class AnalyticsService {
                     .sorted(Comparator.comparingLong(ProjectDurationDto::durationSeconds).reversed())
                     .toList();
 
-            dailyTimeline.add(new DailyActivityDto(currentDay.toString(), dayName, dayWorkingSeconds, dayProjectList));
+            dailyTimeline.add(new DailyActivityDto(currentDay.toString(), dayName, dayWorkingSeconds, dayProjectList, daySessionCount));
             totalWorkingSeconds += dayWorkingSeconds;
 
             if (dayWorkingSeconds > 0) {

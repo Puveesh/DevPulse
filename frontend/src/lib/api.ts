@@ -1,7 +1,29 @@
 import axios, { AxiosError } from 'axios';
 import type { ApiErrorResponse } from '../types';
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+/**
+ * Normalizes backend API base URL ensuring /api/v1 suffix is present.
+ */
+export const normalizeApiUrl = (rawUrl?: string): string => {
+  const trimmed = (rawUrl || '').trim();
+  if (!trimmed) {
+    // In packaged Electron (app: or file:) fallback to localhost default if no env variable is supplied
+    if (typeof window !== 'undefined' && (window.location.protocol === 'app:' || window.location.protocol === 'file:')) {
+      return 'http://localhost:8081/api/v1';
+    }
+    // Web development default using Vite reverse proxy
+    return '/api/v1';
+  }
+
+  const clean = trimmed.replace(/\/+$/, '');
+  if (clean.endsWith('/api/v1')) return clean;
+  if (clean.endsWith('/api')) return `${clean}/v1`;
+  return `${clean}/api/v1`;
+};
+
+export const API_BASE_URL = normalizeApiUrl(
+  import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL
+);
 
 // Token storage in memory/session for non-cookie fallback
 let memoryToken: string | null = sessionStorage.getItem('devpulse_token');

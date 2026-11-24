@@ -59,10 +59,11 @@ release.properties
 dependency-reduced-pom.xml
 buildNumber.properties
 
-# Environment variables & secrets (preserve .env.example)
+# Environment variables & secrets (preserve example files)
 .env
 .env.*
 !.env.example
+!.env*.example
 *.env.local
 
 # Database local volume files

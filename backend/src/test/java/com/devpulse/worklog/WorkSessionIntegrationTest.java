@@ -464,4 +464,176 @@ class WorkSessionIntegrationTest {
                 .andExpect(jsonPath("$.data.name", is("Weather Monitor")))
                 .andExpect(jsonPath("$.data.lastActivity").doesNotExist());
     }
+
+    @Test
+    void testSearchSessions_OrLogic_TitleAndProject() throws Exception {
+        String token = registerAndGetToken("search-or@devpulse.io", "Search User");
+        UUID userId = userRepository.findByEmail("search-or@devpulse.io").orElseThrow().getId();
+
+        Project devpulseProj = projectRepository.save(new Project(userId, "DevPulse", null, null, "Java", ProjectStatus.ACTIVE));
+        Project edutrustProj = projectRepository.save(new Project(userId, "EduTrust", null, null, "React", ProjectStatus.ACTIVE));
+        Project weatherProj = projectRepository.save(new Project(userId, "Weather App", null, null, "Python", ProjectStatus.ACTIVE));
+
+        // Session 1: DevPulse, title "Frontend UI"
+        WorkSession s1 = new WorkSession(userId, devpulseProj.getId(), null, "Frontend UI", null, Instant.parse("2026-11-10T10:00:00Z"));
+        s1.setEndedAt(Instant.parse("2026-11-10T12:00:00Z"));
+        s1.setStatus(WorkSessionStatus.COMPLETED);
+        s1.setTotalDurationSeconds(7200L);
+        workSessionRepository.save(s1);
+
+        // Session 2: EduTrust, title "Backend API Integration"
+        WorkSession s2 = new WorkSession(userId, edutrustProj.getId(), null, "Backend API Integration", null, Instant.parse("2026-11-11T10:00:00Z"));
+        s2.setEndedAt(Instant.parse("2026-11-11T11:00:00Z"));
+        s2.setStatus(WorkSessionStatus.COMPLETED);
+        s2.setTotalDurationSeconds(3600L);
+        workSessionRepository.save(s2);
+
+        // Session 3: Weather App, title "Mobile Widget"
+        WorkSession s3 = new WorkSession(userId, weatherProj.getId(), null, "Mobile Widget", null, Instant.parse("2026-11-12T10:00:00Z"));
+        s3.setEndedAt(Instant.parse("2026-11-12T11:00:00Z"));
+        s3.setStatus(WorkSessionStatus.COMPLETED);
+        s3.setTotalDurationSeconds(3600L);
+        workSessionRepository.save(s3);
+
+        // Search: Project = DevPulse OR Title = "Backend"
+        // Expected: s1 (matches DevPulse) and s2 (matches "Backend"). s3 does not match either.
+        mockMvc.perform(get("/api/v1/work-sessions/search?title=backend&projectId=" + devpulseProj.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.content", hasSize(2)))
+                .andExpect(jsonPath("$.data.page.totalElements", is(2)));
+    }
+
+    @Test
+    void testSearchSessions_OrLogic_TitleAndMonth() throws Exception {
+        String token = registerAndGetToken("search-date-or@devpulse.io", "Date Search User");
+        UUID userId = userRepository.findByEmail("search-date-or@devpulse.io").orElseThrow().getId();
+
+        Project proj = projectRepository.save(new Project(userId, "Cloud Portal", null, null, "Go", ProjectStatus.ACTIVE));
+
+        // Session 1: Nov 2026, Title: "Deployment Scripts"
+        WorkSession s1 = new WorkSession(userId, proj.getId(), null, "Deployment Scripts", null, Instant.parse("2026-11-15T10:00:00Z"));
+        s1.setEndedAt(Instant.parse("2026-11-15T11:00:00Z"));
+        s1.setStatus(WorkSessionStatus.COMPLETED);
+        s1.setTotalDurationSeconds(3600L);
+        workSessionRepository.save(s1);
+
+        // Session 2: Oct 2026 (Different month!), Title: "Database Migration"
+        WorkSession s2 = new WorkSession(userId, proj.getId(), null, "Database Migration", null, Instant.parse("2026-10-15T10:00:00Z"));
+        s2.setEndedAt(Instant.parse("2026-10-15T11:00:00Z"));
+        s2.setStatus(WorkSessionStatus.COMPLETED);
+        s2.setTotalDurationSeconds(3600L);
+        workSessionRepository.save(s2);
+
+        // Session 3: Oct 2026, Title: "Cache warming" (Neither Nov nor "Database")
+        WorkSession s3 = new WorkSession(userId, proj.getId(), null, "Cache warming", null, Instant.parse("2026-10-20T10:00:00Z"));
+        s3.setEndedAt(Instant.parse("2026-10-20T11:00:00Z"));
+        s3.setStatus(WorkSessionStatus.COMPLETED);
+        s3.setTotalDurationSeconds(3600L);
+        workSessionRepository.save(s3);
+
+        // Search: Month = 11 (Nov 2026) OR Title = "Database"
+        // Expected: s1 (matches Month 11) AND s2 (matches Title "Database" even though in Oct). s3 does not match.
+        mockMvc.perform(get("/api/v1/work-sessions/search?title=Database&month=11&year=2026&timezone=UTC")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success", is(true)))
+                .andExpect(jsonPath("$.data.content", hasSize(2)))
+                .andExpect(jsonPath("$.data.page.totalElements", is(2)));
+    }
+
+    @Test
+    void testSearchSessions_SpecificDateSelection() throws Exception {
+        String token = registerAndGetToken("specific-date@devpulse.io", "Date User");
+        UUID userId = userRepository.findByEmail("specific-date@devpulse.io").orElseThrow().getId();
+        Project proj = projectRepository.save(new Project(userId, "Analytics", null, null, "TS", ProjectStatus.ACTIVE));
+
+        // Nov 11, 2026
+        WorkSession s11 = new WorkSession(userId, proj.getId(), null, "Nov 11 Session", null, Instant.parse("2026-11-11T10:00:00Z"));
+        s11.setEndedAt(Instant.parse("2026-11-11T12:00:00Z"));
+        s11.setStatus(WorkSessionStatus.COMPLETED);
+        s11.setTotalDurationSeconds(7200L);
+        workSessionRepository.save(s11);
+
+        // Nov 12, 2026
+        WorkSession s12 = new WorkSession(userId, proj.getId(), null, "Nov 12 Session", null, Instant.parse("2026-11-12T10:00:00Z"));
+        s12.setEndedAt(Instant.parse("2026-11-12T12:00:00Z"));
+        s12.setStatus(WorkSessionStatus.COMPLETED);
+        s12.setTotalDurationSeconds(7200L);
+        workSessionRepository.save(s12);
+
+        // Nov 13, 2026
+        WorkSession s13 = new WorkSession(userId, proj.getId(), null, "Nov 13 Session", null, Instant.parse("2026-11-13T10:00:00Z"));
+        s13.setEndedAt(Instant.parse("2026-11-13T12:00:00Z"));
+        s13.setStatus(WorkSessionStatus.COMPLETED);
+        s13.setTotalDurationSeconds(7200L);
+        workSessionRepository.save(s13);
+
+        // Filter exact date 2026-11-12
+        mockMvc.perform(get("/api/v1/work-sessions/search?date=2026-11-12&timezone=UTC")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].title", is("Nov 12 Session")));
+    }
+
+    @Test
+    void testSearchSessions_MidnightCrossing_AndPauseExclusion() throws Exception {
+        String token = registerAndGetToken("midnight-pause@devpulse.io", "Midnight User");
+        UUID userId = userRepository.findByEmail("midnight-pause@devpulse.io").orElseThrow().getId();
+        Project proj = projectRepository.save(new Project(userId, "Night Owl", null, null, "C++", ProjectStatus.ACTIVE));
+
+        // 1. Session crossing midnight with actual work on both Nov 11 and Nov 12
+        WorkSession sCross = new WorkSession(userId, proj.getId(), null, "Midnight Crosser", null, Instant.parse("2026-11-11T23:30:00Z"));
+        sCross.setEndedAt(Instant.parse("2026-11-12T01:30:00Z"));
+        sCross.setStatus(WorkSessionStatus.COMPLETED);
+        sCross.setTotalDurationSeconds(7200L);
+        workSessionRepository.save(sCross);
+
+        // 2. Session crossing midnight but 100% PAUSED throughout Nov 12
+        WorkSession sPaused = new WorkSession(userId, proj.getId(), null, "Paused Crossing", null, Instant.parse("2026-11-11T23:00:00Z"));
+        sPaused.setEndedAt(Instant.parse("2026-11-12T02:00:00Z"));
+        sPaused.setStatus(WorkSessionStatus.COMPLETED);
+        sPaused.setTotalDurationSeconds(3600L);
+        WorkSession savedPaused = workSessionRepository.save(sPaused);
+
+        // Paused from 23:59 on Nov 11 through 02:00 on Nov 12 (so ZERO working seconds on Nov 12)
+        SessionPauseInterval pauseInterval = new SessionPauseInterval(savedPaused.getId(), Instant.parse("2026-11-11T23:59:00Z"));
+        pauseInterval.setResumedAt(Instant.parse("2026-11-12T02:00:00Z"));
+        pauseIntervalRepository.save(pauseInterval);
+
+        // Query for Nov 12:
+        // sCross had working time from 00:00 to 01:30 on Nov 12 -> MUST be included.
+        // sPaused was 100% paused on Nov 12 -> MUST be excluded!
+        mockMvc.perform(get("/api/v1/work-sessions/search?date=2026-11-12&timezone=UTC")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(1)))
+                .andExpect(jsonPath("$.data.content[0].title", is("Midnight Crosser")));
+    }
+
+    @Test
+    void testSearchSessions_SecurityIsolationOutsideOrGroup() throws Exception {
+        String tokenUser1 = registerAndGetToken("user-sec1@devpulse.io", "Sec User 1");
+        String tokenUser2 = registerAndGetToken("user-sec2@devpulse.io", "Sec User 2");
+
+        UUID user1Id = userRepository.findByEmail("user-sec1@devpulse.io").orElseThrow().getId();
+        UUID user2Id = userRepository.findByEmail("user-sec2@devpulse.io").orElseThrow().getId();
+
+        Project proj1 = projectRepository.save(new Project(user1Id, "Secret Project", null, null, "Java", ProjectStatus.ACTIVE));
+        Project proj2 = projectRepository.save(new Project(user2Id, "Public Project", null, null, "Python", ProjectStatus.ACTIVE));
+
+        WorkSession sUser1 = new WorkSession(user1Id, proj1.getId(), null, "Top Secret Research", null, Instant.parse("2026-11-10T10:00:00Z"));
+        sUser1.setEndedAt(Instant.parse("2026-11-10T11:00:00Z"));
+        sUser1.setStatus(WorkSessionStatus.COMPLETED);
+        workSessionRepository.save(sUser1);
+
+        // User 2 searches for "Secret" or User 1's projectId -> MUST NOT return User 1's session
+        mockMvc.perform(get("/api/v1/work-sessions/search?title=Secret&projectId=" + proj1.getId())
+                        .header("Authorization", "Bearer " + tokenUser2))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content", hasSize(0)))
+                .andExpect(jsonPath("$.data.page.totalElements", is(0)));
+    }
 }

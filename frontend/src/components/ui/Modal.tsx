@@ -1,18 +1,29 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
-  title: string;
+  title: string | React.ReactNode;
   description?: string;
   children: React.ReactNode;
   className?: string;
   contentClassName?: string;
+  position?: 'center' | 'top';
 }
 
-export function Modal({ isOpen, onClose, title, description, children, className, contentClassName }: ModalProps) {
+export function Modal({
+  isOpen,
+  onClose,
+  title,
+  description,
+  children,
+  className,
+  contentClassName,
+  position = 'center',
+}: ModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -33,10 +44,15 @@ export function Modal({ isOpen, onClose, title, description, children, className
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+  const modalNode = (
+    <div
+      className={cn(
+        'fixed inset-0 z-[9999] flex justify-center p-4 sm:p-6 overflow-y-auto pointer-events-auto',
+        position === 'top' ? 'items-start pt-16 sm:pt-20' : 'items-center'
+      )}
+    >
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity animate-in fade-in"
+        className="fixed inset-0 bg-black/75 backdrop-blur-xs transition-opacity animate-in fade-in"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -50,7 +66,11 @@ export function Modal({ isOpen, onClose, title, description, children, className
       >
         <div className="flex items-start justify-between pb-4 border-b border-zinc-800/80 shrink-0">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-zinc-100">{title}</h2>
+            {typeof title === 'string' ? (
+              <h2 className="text-lg font-semibold tracking-tight text-zinc-100">{title}</h2>
+            ) : (
+              title
+            )}
             {description && <p className="text-xs text-zinc-400 mt-1">{description}</p>}
           </div>
           <button
@@ -61,9 +81,10 @@ export function Modal({ isOpen, onClose, title, description, children, className
             <span className="sr-only">Close</span>
           </button>
         </div>
-        <div className={cn("pt-4", contentClassName)}>{children}</div>
+        <div className={cn('pt-4', contentClassName)}>{children}</div>
       </div>
     </div>
   );
-}
 
+  return typeof document !== 'undefined' ? createPortal(modalNode, document.body) : modalNode;
+}
