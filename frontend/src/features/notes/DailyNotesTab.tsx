@@ -17,7 +17,6 @@ import {
   useDailyNotesHistory,
   useSaveDailyNote,
 } from '../../hooks/useDailyNotes';
-import { formatDate } from '../../lib/utils';
 import { Button } from '../../components/ui/Button';
 import type { Task, WorkSession } from '../../types';
 

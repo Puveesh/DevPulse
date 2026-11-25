@@ -6,7 +6,7 @@ import { Alert } from '../../components/ui/Alert';
 import { useEndSession } from '../../hooks/useWorkSessions';
 import { formatDuration, formatTime } from '../../lib/utils';
 import type { WorkSession } from '../../types';
-import { Square, Clock, FolderKanban } from 'lucide-react';
+import { Square, FolderKanban } from 'lucide-react';
 
 interface EndSessionModalProps {
   isOpen: boolean;

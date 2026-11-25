@@ -64,7 +64,7 @@ export function WorkSessionProvider({ children }: { children: React.ReactNode })
     if (activeSession.status === 'ACTIVE') {
       const interval = setInterval(updateTime, 1000);
 
-      // Instant synchronization upon window focus or Electron restore
+      // Instant synchronization upon window focus or tab visibility change
       const handleWindowFocus = () => {
         updateTime();
       };

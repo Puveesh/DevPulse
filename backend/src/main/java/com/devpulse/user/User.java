@@ -12,7 +12,7 @@ public class User extends BaseEntity {
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
     @Column(name = "display_name", nullable = false, length = 100)
@@ -79,6 +79,10 @@ public class User extends BaseEntity {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public boolean hasPassword() {
+        return passwordHash != null && !passwordHash.isBlank();
     }
 
     public void setPasswordHash(String passwordHash) {
@@ -203,5 +207,16 @@ public class User extends BaseEntity {
 
     public void setProfileImage(String profileImage) {
         this.profileImage = profileImage;
+    }
+
+    @Column(name = "last_seen_at")
+    private java.time.Instant lastSeenAt;
+
+    public java.time.Instant getLastSeenAt() {
+        return lastSeenAt;
+    }
+
+    public void setLastSeenAt(java.time.Instant lastSeenAt) {
+        this.lastSeenAt = lastSeenAt;
     }
 }

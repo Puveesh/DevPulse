@@ -1,13 +1,11 @@
-# DevPulse Desktop Client
+# DevPulse Web Application Frontend
 
-The desktop runtime for DevPulse, built with React 19, TypeScript, Tailwind CSS, Vite, and Electron.
+The standard web application frontend for DevPulse, built with React 19, TypeScript, Tailwind CSS v4, and Vite.
 
-## Scripts
+## Development Scripts
 
-- `npm run dev`: Launch the DevPulse Desktop Client in development mode with live Vite HMR.
-- `npm run dev:web`: Launch the frontend independently in a standard web browser.
-- `npm run build`: Build production desktop main, preload, and renderer packages into `out/`.
-- `npm run build:web`: Build the web bundle into `dist/`.
-- `npm run dist`: Package the Windows NSIS installer wizard (`DevPulse Desktop Client Setup 0.1.0.exe`).
-- `npm run dist:dir`: Package an unpacked directory with `DevPulse Desktop Client.exe`.
-- `npm test`: Run Vitest unit tests.
+- `npm run dev`: Launch the Vite development server with Hot Module Replacement (HMR) at `http://localhost:5173`.
+- `npm run build`: Compile TypeScript and bundle production web assets into `dist/`.
+- `npm run preview`: Locally preview the production build.
+- `npm run lint`: Run Oxlint against the frontend codebase.
+- `npm test`: Run the Vitest test suite.

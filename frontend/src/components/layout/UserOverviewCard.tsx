@@ -3,7 +3,7 @@ import type { User } from '../../types';
 import { X, Settings, LogOut, Mail, Briefcase, Calendar, Sparkles, ZoomIn } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { useNavigate } from 'react-router-dom';
-import { formatDate } from '../../lib/utils';
+import { formatDate, getInitials } from '../../lib/utils';
 import { Modal } from '../ui/Modal';
 
 interface UserOverviewCardProps {
@@ -19,16 +19,11 @@ export const UserOverviewCard: React.FC<UserOverviewCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const [isPhotoPreviewOpen, setIsPhotoPreviewOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
+  React.useEffect(() => {
+    setImageError(false);
+  }, [user?.profileImage]);
 
   return (
     <>
@@ -61,18 +56,19 @@ export const UserOverviewCard: React.FC<UserOverviewCardProps> = ({
           <div className="relative group mb-3">
             <div
               className={`w-20 h-20 rounded-full border-2 border-blue-500/40 ring-4 ring-blue-500/10 shadow-lg overflow-hidden bg-zinc-900 flex items-center justify-center ${
-                user?.profileImage ? 'cursor-pointer hover:border-blue-400 transition-all' : ''
+                user?.profileImage && !imageError ? 'cursor-pointer hover:border-blue-400 transition-all' : ''
               }`}
               onClick={() => {
-                if (user?.profileImage) setIsPhotoPreviewOpen(true);
+                if (user?.profileImage && !imageError) setIsPhotoPreviewOpen(true);
               }}
-              title={user?.profileImage ? 'Click to view enlarged photo' : undefined}
+              title={user?.profileImage && !imageError ? 'Click to view enlarged photo' : undefined}
             >
-              {user?.profileImage ? (
+              {user?.profileImage && !imageError ? (
                 <>
                   <img
                     src={user.profileImage}
                     alt={user.displayName || 'Developer'}
+                    onError={() => setImageError(true)}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full">
@@ -81,7 +77,7 @@ export const UserOverviewCard: React.FC<UserOverviewCardProps> = ({
                 </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-blue-600/20 text-blue-400 font-bold text-2xl font-mono">
-                  {getInitials(user?.displayName)}
+                  {getInitials(user?.displayName || user?.email)}
                 </div>
               )}
             </div>

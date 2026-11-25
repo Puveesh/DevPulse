@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogoutConfirmModal } from '../common/LogoutConfirmModal';
 import { ProjectModal } from '../../features/projects/ProjectModal';
 import { UserOverviewCard } from './UserOverviewCard';
+import { getInitials } from '../../lib/utils';
 
 export function Navbar() {
   const { user, logout } = useAuth();
@@ -13,7 +14,12 @@ export function Navbar() {
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [isUserOverviewOpen, setIsUserOverviewOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [user?.profileImage]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -36,21 +42,11 @@ export function Navbar() {
     };
   }, [isUserOverviewOpen]);
 
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
-
   return (
     <>
       <header className="h-14 border-b border-zinc-800/80 bg-zinc-950/40 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-2.5">
-          <span className="text-xs font-medium text-zinc-300">DevPulse Desktop Client</span>
+          <span className="text-xs font-medium text-zinc-300">DevPulse</span>
         </div>
 
         <div className="flex items-center gap-4">
@@ -76,15 +72,16 @@ export function Navbar() {
                 aria-expanded={isUserOverviewOpen}
                 aria-haspopup="dialog"
               >
-                {user?.profileImage ? (
+                {user?.profileImage && !imageError ? (
                   <img
                     src={user.profileImage}
                     alt={user.displayName || 'Developer'}
+                    onError={() => setImageError(true)}
                     className="w-8 h-8 rounded-full object-cover border border-blue-500/30"
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-xs font-semibold text-blue-400">
-                    {getInitials(user?.displayName)}
+                    {getInitials(user?.displayName || user?.email)}
                   </div>
                 )}
                 <div className="hidden sm:block text-left">

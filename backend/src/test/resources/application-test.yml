@@ -24,3 +24,9 @@ app:
     cookie-same-site: Lax
   cors:
     allowed-origins: http://localhost:5173
+  oauth:
+    google:
+      client-id: test-google-client-id.apps.googleusercontent.com
+      client-secret: test-google-client-secret
+      redirect-uri: http://localhost:8081/api/v1/auth/google/callback
+      web-callback-uri: http://localhost:5173/auth/callback

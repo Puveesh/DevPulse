@@ -1,6 +1,8 @@
 package com.devpulse.user;
 
 import com.devpulse.auth.dto.UserResponse;
+import com.devpulse.auth.oauth.UserAuthIdentity;
+import com.devpulse.auth.oauth.UserAuthIdentityRepository;
 import com.devpulse.common.BadRequestException;
 import com.devpulse.common.ResourceNotFoundException;
 import com.devpulse.project.ProjectRepository;
@@ -41,6 +43,7 @@ public class UserService {
     private final SessionPauseIntervalRepository sessionPauseIntervalRepository;
     private final DailyNoteRepository dailyNoteRepository;
     private final AttachmentMetadataRepository attachmentMetadataRepository;
+    private final UserAuthIdentityRepository identityRepository;
 
     public UserService(
             UserRepository userRepository,
@@ -50,7 +53,8 @@ public class UserService {
             WorkSessionRepository workSessionRepository,
             SessionPauseIntervalRepository sessionPauseIntervalRepository,
             DailyNoteRepository dailyNoteRepository,
-            AttachmentMetadataRepository attachmentMetadataRepository) {
+            AttachmentMetadataRepository attachmentMetadataRepository,
+            UserAuthIdentityRepository identityRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.projectRepository = projectRepository;
@@ -59,12 +63,13 @@ public class UserService {
         this.sessionPauseIntervalRepository = sessionPauseIntervalRepository;
         this.dailyNoteRepository = dailyNoteRepository;
         this.attachmentMetadataRepository = attachmentMetadataRepository;
+        this.identityRepository = identityRepository;
     }
 
     @Transactional(readOnly = true)
     public UserResponse getProfile(UUID userId) {
         User user = findUserById(userId);
-        return UserResponse.fromUser(user);
+        return toUserResponse(user);
     }
 
     @Transactional
@@ -85,7 +90,7 @@ public class UserService {
         user.setCurrentFocus(request.currentFocus());
 
         User saved = userRepository.save(user);
-        return UserResponse.fromUser(saved);
+        return toUserResponse(saved);
     }
 
     @Transactional
@@ -109,7 +114,7 @@ public class UserService {
         }
 
         User saved = userRepository.save(user);
-        return UserResponse.fromUser(saved);
+        return toUserResponse(saved);
     }
 
     @Transactional
@@ -131,7 +136,7 @@ public class UserService {
         User user = findUserById(userId);
         user.setProfileImage(trimmed);
         User saved = userRepository.save(user);
-        return UserResponse.fromUser(saved);
+        return toUserResponse(saved);
     }
 
     @Transactional
@@ -156,7 +161,7 @@ public class UserService {
             User user = findUserById(userId);
             user.setProfileImage(dataUrl);
             User saved = userRepository.save(user);
-            return UserResponse.fromUser(saved);
+            return toUserResponse(saved);
         } catch (IOException e) {
             throw new BadRequestException("Failed to process uploaded image file: " + e.getMessage());
         }
@@ -167,45 +172,59 @@ public class UserService {
         User user = findUserById(userId);
         user.setProfileImage(null);
         User saved = userRepository.save(user);
-        return UserResponse.fromUser(saved);
+        return toUserResponse(saved);
     }
 
     @Transactional
     public void deleteAccount(UUID userId, DeleteAccountRequest request) {
         User user = findUserById(userId);
 
-        if (request.password() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new BadRequestException("Incorrect account password. Deletion aborted.");
+        if (user.hasPassword()) {
+            if (request.password() == null || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+                throw new BadRequestException("Incorrect account password. Deletion aborted.");
+            }
         }
 
         if (request.confirmation() == null || !"DELETE MY ACCOUNT".equals(request.confirmation().trim())) {
             throw new BadRequestException("Confirmation text must exactly match 'DELETE MY ACCOUNT'.");
         }
 
-        // 1. Delete session pause intervals for all user sessions
+        // 1. Delete linked identities
+        identityRepository.deleteByUserId(userId);
+
+        // 2. Delete session pause intervals for all user sessions
         List<WorkSession> userSessions = workSessionRepository.findByUserIdOrderByStartedAtDesc(userId, Pageable.unpaged()).getContent();
         if (!userSessions.isEmpty()) {
             List<UUID> sessionIds = userSessions.stream().map(WorkSession::getId).toList();
             sessionPauseIntervalRepository.deleteBySessionIdIn(sessionIds);
         }
 
-        // 2. Delete daily notes
+        // 3. Delete daily notes
         dailyNoteRepository.deleteByUserId(userId);
 
-        // 3. Delete attachments metadata
+        // 4. Delete attachments metadata
         attachmentMetadataRepository.deleteByUserId(userId);
 
-        // 4. Delete work sessions
+        // 5. Delete work sessions
         workSessionRepository.deleteByUserId(userId);
 
-        // 5. Delete tasks
+        // 6. Delete tasks
         taskRepository.deleteByUserId(userId);
 
-        // 6. Delete projects
+        // 7. Delete projects
         projectRepository.deleteByUserId(userId);
 
-        // 7. Delete user
+        // 8. Delete user
         userRepository.delete(user);
+    }
+
+    private UserResponse toUserResponse(User user) {
+        java.util.Optional<UserAuthIdentity> identity = identityRepository.findByUserIdAndProvider(user.getId(), "google");
+        return UserResponse.fromUser(
+                user,
+                identity.isPresent(),
+                identity.map(UserAuthIdentity::getProviderEmail).orElse(null)
+        );
     }
 
     private User findUserById(UUID userId) {

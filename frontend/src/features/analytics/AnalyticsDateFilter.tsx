@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
-  X,
   RotateCcw,
   AlertCircle,
 } from 'lucide-react';

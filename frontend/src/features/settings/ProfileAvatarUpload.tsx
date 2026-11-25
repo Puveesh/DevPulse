@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Camera, Trash2, Loader2, Upload, ZoomIn } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { getInitials } from '../../lib/utils';
 
 interface ProfileAvatarUploadProps {
   displayName?: string;
@@ -16,7 +17,7 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
   profileImage,
   onUpload,
   onRemove,
-  isEditing = true,
+  isEditing: _isEditing = true,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -24,16 +25,11 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPhotoPreviewOpen, setIsPhotoPreviewOpen] = useState(false);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
-  const getInitials = (name?: string) => {
-    if (!name) return 'U';
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-  };
+  useEffect(() => {
+    setImageError(false);
+  }, [profileImage]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -122,21 +118,22 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
             onClick={() => {
               if (profileImage) setIsPhotoPreviewOpen(true);
             }}
-            title={profileImage ? 'Click to view full photo' : undefined}
-            role={profileImage ? 'button' : undefined}
-            tabIndex={profileImage ? 0 : undefined}
+            title={profileImage && !imageError ? 'Click to view full photo' : undefined}
+            role={profileImage && !imageError ? 'button' : undefined}
+            tabIndex={profileImage && !imageError ? 0 : undefined}
             onKeyDown={(e) => {
-              if (profileImage && (e.key === 'Enter' || e.key === ' ')) {
+              if (profileImage && !imageError && (e.key === 'Enter' || e.key === ' ')) {
                 e.preventDefault();
                 setIsPhotoPreviewOpen(true);
               }
             }}
           >
-            {profileImage ? (
+            {profileImage && !imageError ? (
               <>
                 <img
                   src={profileImage}
                   alt={displayName || 'Developer Avatar'}
+                  onError={() => setImageError(true)}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                 />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-full">
@@ -270,7 +267,7 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              variant="danger"
               size="sm"
               disabled={isRemoving}
               onClick={handleConfirmRemove}

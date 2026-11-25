@@ -5,7 +5,6 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Textarea } from '../../components/ui/Textarea';
 import { Select } from '../../components/ui/Select';
-import { Alert } from '../../components/ui/Alert';
 import {
   User as UserIcon,
   Shield,
@@ -29,6 +28,8 @@ import { formatDate } from '../../lib/utils';
 import { ProfileAvatarUpload } from './ProfileAvatarUpload';
 import { TagMultiSelect } from './TagMultiSelect';
 import { DeleteAccountModal } from './DeleteAccountModal';
+import { ConnectedAccountsCard } from './ConnectedAccountsCard';
+import { ChangePasswordCard } from './ChangePasswordCard';
 import { Toast } from '../../components/ui/Toast';
 
 // Standard common timezones
@@ -75,7 +76,7 @@ const SUGGESTED_TECHNOLOGIES = [
   'PostgreSQL',
   'Docker',
   'Git',
-  'Electron',
+  'Vite',
   'Next.js',
   'TailwindCSS',
   'Redis',
@@ -722,6 +723,16 @@ export function SettingsPage() {
         </Card>
 
         {/* ========================================================================= */}
+        {/* 3. CONNECTED ACCOUNTS CARD                                                */}
+        {/* ========================================================================= */}
+        <ConnectedAccountsCard onNotify={(n) => setStatusNotification(n)} />
+
+        {/* ========================================================================= */}
+        {/* 4. PASSWORD MANAGEMENT CARD                                               */}
+        {/* ========================================================================= */}
+        <ChangePasswordCard onNotify={(n) => setStatusNotification(n)} />
+          
+        {/* ========================================================================= */}
         {/* 2. WORKSPACE PREFERENCES CARD                                             */}
         {/* ========================================================================= */}
         <Card className="border-zinc-800/80 bg-zinc-900/40">
@@ -871,8 +882,9 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
+
         {/* ========================================================================= */}
-        {/* 3. AUTHENTICATION & SECURITY CARD                                         */}
+        {/* 5. AUTHENTICATION & SECURITY OVERVIEW                                     */}
         {/* ========================================================================= */}
         <Card className="border-zinc-800/80 bg-zinc-900/40">
           <CardHeader>
@@ -897,9 +909,6 @@ export function SettingsPage() {
                 <span className="font-mono text-zinc-400">BCrypt (rounds: 10-12)</span>
               </div>
             </div>
-            <Button variant="outline" size="sm" disabled>
-              Change Password (Phase 2)
-            </Button>
           </CardContent>
         </Card>
 

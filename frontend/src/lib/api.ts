@@ -7,11 +7,6 @@ import type { ApiErrorResponse } from '../types';
 export const normalizeApiUrl = (rawUrl?: string): string => {
   const trimmed = (rawUrl || '').trim();
   if (!trimmed) {
-    // In packaged Electron (app: or file:) fallback to localhost default if no env variable is supplied
-    if (typeof window !== 'undefined' && (window.location.protocol === 'app:' || window.location.protocol === 'file:')) {
-      return 'http://localhost:8081/api/v1';
-    }
-    // Web development default using Vite reverse proxy
     return '/api/v1';
   }
 
@@ -21,19 +16,24 @@ export const normalizeApiUrl = (rawUrl?: string): string => {
   return `${clean}/api/v1`;
 };
 
+// Centralized API base URL configuration from environment or standard web fallback
 export const API_BASE_URL = normalizeApiUrl(
   import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL
 );
 
+export const getApiBaseUrl = (): string => API_BASE_URL;
+
 // Token storage in memory/session for non-cookie fallback
-let memoryToken: string | null = sessionStorage.getItem('devpulse_token');
+let memoryToken: string | null = typeof window !== 'undefined' ? sessionStorage.getItem('devpulse_token') : null;
 
 export const setAuthToken = (token: string | null) => {
   memoryToken = token;
-  if (token) {
-    sessionStorage.setItem('devpulse_token', token);
-  } else {
-    sessionStorage.removeItem('devpulse_token');
+  if (typeof window !== 'undefined') {
+    if (token) {
+      sessionStorage.setItem('devpulse_token', token);
+    } else {
+      sessionStorage.removeItem('devpulse_token');
+    }
   }
 };
 
@@ -58,12 +58,6 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiErrorResponse>) => {
-    // If 401 Unauthorized occurs on protected routes, session may be expired
-    if (error.response?.status === 401) {
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-        // Can notify auth context or dispatch event
-      }
-    }
     return Promise.reject(error);
   }
 );
@@ -76,6 +70,21 @@ export function extractErrorMessage(error: unknown): string {
     }
     if (data?.message) {
       return data.message;
+    }
+    if (error.response?.status === 502) {
+      return 'Server is unreachable (502 Bad Gateway). The backend service is not running or unreachable.';
+    }
+    if (error.response?.status === 503) {
+      return 'Service temporarily unavailable (503). The server is undergoing maintenance or starting up.';
+    }
+    if (error.response?.status === 504) {
+      return 'Gateway timeout (504). The backend server took too long to respond.';
+    }
+    if (error.code === 'ECONNABORTED') {
+      return 'Connection timed out. Please check your network and server address.';
+    }
+    if (error.code === 'ERR_NETWORK' || !error.response) {
+      return 'Cannot reach the server. Please verify your network connection.';
     }
     if (error.message) {
       return error.message;

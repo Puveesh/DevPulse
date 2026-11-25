@@ -18,7 +18,6 @@ import {
   Plus,
   ArrowRight,
   TrendingUp,
-  Calendar,
   Terminal,
   Square,
   FileText,

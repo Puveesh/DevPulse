@@ -1,17 +1,12 @@
 {
-  "name": "devpulse-desktop-client",
+  "name": "devpulse-frontend",
   "private": true,
-  "version": "0.1.0",
-  "description": "DevPulse Desktop Client - Developer Worklog & Analytics Platform",
+  "version": "0.0.1",
+  "description": "DevPulse - Developer Worklog & Analytics Platform",
   "type": "module",
-  "main": "out/main/main.cjs",
   "scripts": {
-    "dev": "node electron/dev.mjs",
-    "dev:web": "vite",
-    "build": "electron-vite build",
-    "build:web": "tsc -b && vite build",
-    "dist": "electron-builder --win",
-    "dist:dir": "electron-builder --dir",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run"
@@ -39,8 +34,6 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@electron-toolkit/preload": "^3.0.2",
-    "@electron-toolkit/utils": "^4.0.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
@@ -50,9 +43,6 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "autoprefixer": "^10.6.2",
-    "electron": "^45.2.3",
-    "electron-builder": "^26.18.0",
-    "electron-vite": "^6.0.0",
     "jsdom": "^29.1.1",
     "oxlint": "^1.89.0",
     "postcss": "^8.5.32",

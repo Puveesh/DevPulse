@@ -26,9 +26,25 @@ public record UserResponse(
         String accountStatus,
         String authMethod,
         String databaseInfo,
-        String dataIsolation
+        String dataIsolation,
+        boolean hasPassword,
+        boolean googleLinked,
+        String googleEmail
 ) {
     public static UserResponse fromUser(User user) {
+        return fromUser(user, false, null);
+    }
+
+    public static UserResponse fromUser(User user, boolean googleLinked, String googleEmail) {
+        String authMethodDesc;
+        if (googleLinked && user.hasPassword()) {
+            authMethodDesc = "Email/Password + Linked Google";
+        } else if (googleLinked) {
+            authMethodDesc = "Google OAuth 2.0 (Single Sign-On)";
+        } else {
+            authMethodDesc = "Email/Password + JWT Bearer";
+        }
+
         return new UserResponse(
                 user.getId(),
                 user.getEmail(),
@@ -49,9 +65,12 @@ public record UserResponse(
                 user.getWeekStartDay() != null ? user.getWeekStartDay() : "Monday",
                 user.getTheme() != null ? user.getTheme() : "dark",
                 "ACTIVE",
-                "JWT Bearer + HttpOnly Cookie",
+                authMethodDesc,
                 "MySQL 8.0 (Relational schema with Flyway migrations)",
-                "Workspace data isolated by developer UUID"
+                "Workspace data isolated by developer UUID",
+                user.hasPassword(),
+                googleLinked,
+                googleEmail
         );
     }
 }

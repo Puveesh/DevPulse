@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import type { User, ApiResponse, AuthResponseData, UpdateProfilePayload, UpdatePreferencesPayload } from '../types';
+import type { User, ApiResponse, AuthResponseData, UpdateProfilePayload, UpdatePreferencesPayload, GoogleLinkStatus } from '../types';
 import apiClient, { setAuthToken, getAuthToken, extractErrorMessage } from '../lib/api';
+import { exchangeOAuthTicket } from '../features/auth/googleAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -9,6 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (data: { email: string; password: string }) => Promise<void>;
   register: (data: { email: string; password: string; displayName: string }) => Promise<void>;
+  exchangeGoogleTicket: (ticket: string, state: string) => Promise<AuthResponseData>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<User>;
@@ -16,6 +18,10 @@ interface AuthContextType {
   uploadAvatar: (dataUrlOrFile: string | File) => Promise<User>;
   removeAvatar: () => Promise<User>;
   deleteAccount: (payload: { password: string; confirmation: string }) => Promise<void>;
+  getGoogleLinkStatus: () => Promise<GoogleLinkStatus>;
+  unlinkGoogle: () => Promise<void>;
+  changePassword: (payload: { currentPassword: string; newPassword: string; confirmPassword: string }) => Promise<void>;
+  setPassword: (payload: { newPassword: string; confirmPassword: string }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,6 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshProfile();
   }, [refreshProfile]);
 
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      apiClient.post('/auth/heartbeat').catch(() => {});
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const login = async (credentials: { email: string; password: string }) => {
     try {
       const res = await apiClient.post<ApiResponse<AuthResponseData>>('/auth/login', credentials);
@@ -71,6 +85,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(data.accessToken);
       }
       setUser(data.user);
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
+  const exchangeGoogleTicket = async (ticket: string, state: string): Promise<AuthResponseData> => {
+    try {
+      const data = await exchangeOAuthTicket(ticket, state);
+      if (data?.accessToken) {
+        setAuthToken(data.accessToken);
+        setToken(data.accessToken);
+      }
+      setUser(data.user);
+      return data;
     } catch (err) {
       throw new Error(extractErrorMessage(err));
     }
@@ -163,6 +191,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const getGoogleLinkStatus = async (): Promise<GoogleLinkStatus> => {
+    try {
+      const res = await apiClient.get<ApiResponse<GoogleLinkStatus>>('/account/google/link/status');
+      if (res.data?.success && res.data.data) {
+        return res.data.data;
+      }
+      throw new Error(res.data?.message || 'Failed to retrieve Google link status');
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
+  const unlinkGoogle = async (): Promise<void> => {
+    try {
+      const res = await apiClient.delete<ApiResponse<void>>('/account/google/link');
+      if (!res.data?.success) {
+        throw new Error(res.data?.message || 'Failed to unlink Google account');
+      }
+      await refreshProfile();
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
+  const changePassword = async (payload: { currentPassword: string; newPassword: string; confirmPassword: string }): Promise<void> => {
+    try {
+      const res = await apiClient.put<ApiResponse<void>>('/account/change-password', payload);
+      if (!res.data?.success) {
+        throw new Error(res.data?.message || 'Failed to change password');
+      }
+      await refreshProfile();
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
+  const setPassword = async (payload: { newPassword: string; confirmPassword: string }): Promise<void> => {
+    try {
+      const res = await apiClient.post<ApiResponse<void>>('/account/set-password', payload);
+      if (!res.data?.success) {
+        throw new Error(res.data?.message || 'Failed to set password');
+      }
+      await refreshProfile();
+    } catch (err) {
+      throw new Error(extractErrorMessage(err));
+    }
+  };
+
   const value = {
     user,
     token,
@@ -170,6 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     login,
     register,
+    exchangeGoogleTicket,
     logout,
     refreshProfile,
     updateProfile,
@@ -177,6 +254,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     uploadAvatar,
     removeAvatar,
     deleteAccount,
+    getGoogleLinkStatus,
+    unlinkGoogle,
+    changePassword,
+    setPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -189,4 +270,3 @@ export function useAuth() {
   }
   return context;
 }
-

@@ -23,6 +23,15 @@ export interface User {
   authMethod?: string | null;
   databaseInfo?: string | null;
   dataIsolation?: string | null;
+  hasPassword?: boolean;
+  googleLinked?: boolean;
+  googleEmail?: string | null;
+}
+
+export interface GoogleLinkStatus {
+  linked: boolean;
+  googleEmail: string | null;
+  hasPassword: boolean;
 }
 
 export interface UpdateProfilePayload {

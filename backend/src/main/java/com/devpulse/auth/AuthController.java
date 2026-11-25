@@ -66,4 +66,24 @@ public class AuthController {
         UserResponse userResponse = authService.getCurrentUser(principal);
         return ResponseEntity.ok(ApiResponse.success("User profile retrieved", userResponse));
     }
+
+    @PostMapping("/heartbeat")
+    @Operation(summary = "User session heartbeat", description = "Refreshes user last-seen activity timestamp")
+    public ResponseEntity<ApiResponse<Void>> heartbeat(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal == null) {
+            throw new com.devpulse.common.UnauthorizedException("Authentication is required to record heartbeat");
+        }
+        authService.recordHeartbeat(principal);
+        return ResponseEntity.ok(ApiResponse.success("Heartbeat recorded", null));
+    }
+
+    @GetMapping("/health")
+    @Operation(summary = "Backend health check", description = "Public health check endpoint for testing backend connectivity")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> health() {
+        return ResponseEntity.ok(ApiResponse.success("DevPulse backend is online", java.util.Map.of(
+                "status", "UP",
+                "service", "devpulse-backend",
+                "timestamp", java.time.Instant.now().toString()
+        )));
+    }
 }

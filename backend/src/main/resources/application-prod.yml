@@ -1,0 +1,19 @@
+# DevPulse Production Configuration Profile
+# Active when running with: -Dspring.profiles.active=prod or SPRING_PROFILES_ACTIVE=prod
+
+spring:
+  jpa:
+    show-sql: false
+
+# Disable Swagger UI and OpenAPI documentation in production
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  jwt:
+    # Over HTTPS / production domains, enforce secure cookies
+    cookie-secure: ${JWT_COOKIE_SECURE:true}
+    cookie-same-site: ${JWT_COOKIE_SAME_SITE:Lax}

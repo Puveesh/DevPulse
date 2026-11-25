@@ -215,9 +215,9 @@ describe('Project Daily Notes Development Journal', () => {
     const sampleProjects = [
       {
         id: 'proj-1',
-        name: 'DevPulse Desktop Version',
+        name: 'DevPulse Web Version',
         description: 'Developer productivity tool with rich journal',
-        techStack: 'React, Electron, Spring Boot',
+        techStack: 'React, Spring Boot',
         status: 'ACTIVE' as const,
         createdAt: '2026-11-01T00:00:00Z',
         updatedAt: '2026-11-13T00:00:00Z',

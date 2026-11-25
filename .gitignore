@@ -64,6 +64,10 @@ buildNumber.properties
 .env.*
 !.env.example
 *.env.local
+application-local.yml
+application-local.yaml
+*.secret
+secrets/
 
 # Database local volume files
 *.db

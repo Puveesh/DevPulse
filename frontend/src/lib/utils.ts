@@ -120,4 +120,45 @@ export function calculateWorkingSeconds(
   return Math.max(0, Math.floor(workingMs / 1000));
 }
 
+/**
+ * Extracts developer initials for avatar display.
+ * - Multi-word or delimiter names: "Jane Doe" -> "JD", "test_user" -> "TU", "test.user" -> "TU"
+ * - camelCase / PascalCase compound names: "testUser" -> "TU", "TestUser" -> "TU"
+ * - Single capitalized names: "Alice" -> "A"
+ * - General single-token fallback: "tu" -> "TU", "A" -> "A"
+ * - Fallback for missing/empty values: "U"
+ */
+export function getInitials(name?: string | null): string {
+  if (!name || !name.trim()) return 'U';
+  const trimmed = name.trim();
+
+  // 1. Delimiter-separated words: spaces, underscores, hyphens, dots
+  const parts = trimmed.split(/[\s_.-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  const word = parts[0] || trimmed;
+
+  // 2. camelCase names: e.g. "testUser" -> 't' + 'U' = "TU"
+  const camelMatch = word.match(/^[a-z]+([A-Z])/);
+  if (camelMatch) {
+    return (word[0] + camelMatch[1]).toUpperCase();
+  }
+
+  // 3. PascalCase names: e.g. "TestUser" -> 'T' + 'U' = "TU"
+  const pascalMatch = word.match(/^[A-Z][a-z]+([A-Z])/);
+  if (pascalMatch) {
+    return (word[0] + pascalMatch[1]).toUpperCase();
+  }
+
+  // 4. Single capitalized word (e.g. "Alice") -> first letter "A"
+  if (/^[A-Z][a-z]*$/.test(word)) {
+    return word[0].toUpperCase();
+  }
+
+  // 5. Fallback for any other single token
+  return word.slice(0, 2).toUpperCase();
+}
+
 

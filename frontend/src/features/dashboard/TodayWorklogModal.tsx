@@ -11,7 +11,6 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { useTodayAnalytics } from '../../hooks/useAnalytics';
 import { useWorkSessionContext } from '../../contexts/WorkSessionContext';
 import {
-  formatDate,
   formatTime,
   formatDurationHoursMinutes,
   formatDuration,
@@ -38,14 +37,6 @@ export const TodayWorklogModal: React.FC<TodayWorklogModalProps> = ({
 }) => {
   const { data: todayData, isLoading } = useTodayAnalytics();
   const { activeSession, elapsedSeconds } = useWorkSessionContext();
-
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }, []);
 
   // Real-time dynamic ticking for active session without repeated polling
   const liveActiveExtra =

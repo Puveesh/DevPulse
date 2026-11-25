@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import type { ProjectAnalytics } from '../../types';
 import { formatDurationHoursMinutes } from '../../lib/utils';
-import { FolderKanban, ArrowRight, CheckCircle2, Clock } from 'lucide-react';
+import { FolderKanban, ArrowRight, Clock } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 
 interface ProjectDistributionSectionProps {
@@ -34,7 +34,7 @@ const PROJECT_PALETTE = [
 
 export const ProjectDistributionSection: React.FC<ProjectDistributionSectionProps> = ({
   projects,
-  totalWorkingSeconds,
+  totalWorkingSeconds: _totalWorkingSeconds,
 }) => {
   const navigate = useNavigate();
 
@@ -232,7 +232,7 @@ export const ProjectDistributionSection: React.FC<ProjectDistributionSectionProp
                       <span className="text-sm font-semibold text-zinc-200 group-hover:text-blue-400 transition-colors truncate">
                         {p.projectName}
                       </span>
-                      <Badge status={p.status} />
+                      <Badge status={p.status as any} />
                     </div>
                     {p.techStack && (
                       <p className="text-[11px] font-mono text-zinc-500 truncate pl-4.5">

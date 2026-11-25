@@ -246,7 +246,7 @@ export function DailyNoteEditor({
                       label: item.label,
                       date: item.date,
                       status: item.status,
-                    });
+                    } as any);
                   },
                 });
               },
