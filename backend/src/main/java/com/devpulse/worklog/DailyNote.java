@@ -21,7 +21,7 @@ public class DailyNote extends BaseEntity {
     @Column(name = "note_date", nullable = false)
     private LocalDate noteDate;
 
-    @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
+    @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
     public DailyNote() {

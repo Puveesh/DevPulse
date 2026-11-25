@@ -57,7 +57,7 @@ public class User extends BaseEntity {
     @Column(name = "theme", length = 50)
     private String theme = "dark";
 
-    @Column(name = "profile_image", columnDefinition = "LONGTEXT")
+    @Column(name = "profile_image", columnDefinition = "TEXT")
     private String profileImage;
 
     public User() {

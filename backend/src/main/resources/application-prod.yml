@@ -2,8 +2,30 @@
 # Active when running with: -Dspring.profiles.active=prod or SPRING_PROFILES_ACTIVE=prod
 
 spring:
+  datasource:
+    url: ${DB_URL:${DATABASE_URL:}}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${HIKARI_MAX_POOL_SIZE:5}
+      minimum-idle: ${HIKARI_MIN_IDLE:0}
+      idle-timeout: ${HIKARI_IDLE_TIMEOUT:300000}        # 5 minutes: allow idle connections to close so Neon compute can auto-suspend
+      max-lifetime: ${HIKARI_MAX_LIFETIME:600000}        # 10 minutes: maximum connection lifetime
+      connection-timeout: ${HIKARI_CONN_TIMEOUT:30000}    # 30 seconds: accommodate Neon cold-start wake-up latency
   jpa:
+    hibernate:
+      ddl-auto: validate
     show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/postgres
+    baseline-on-migrate: true
+    validate-on-migrate: false
 
 # Disable Swagger UI and OpenAPI documentation in production
 springdoc:

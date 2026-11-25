@@ -1,3 +1,4 @@
+
 # Logs
 logs
 *.log
@@ -89,3 +90,4 @@ ehthumbs.db
 *.njsproj
 *.sln
 *.sw?
+devpulse_backup.sql
