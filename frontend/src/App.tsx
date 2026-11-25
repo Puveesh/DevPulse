@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { WorkSessionProvider } from './contexts/WorkSessionContext';
@@ -6,7 +7,6 @@ import { ProtectedRoute } from './components/common/ProtectedRoute';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
-import { OAuthCallbackPage } from './features/auth/OAuthCallbackPage';
 import { DashboardPage } from './features/dashboard/DashboardPage';
 import { ProjectsPage } from './features/projects/ProjectsPage';
 import { ProjectDetailPage } from './features/projects/ProjectDetailPage';
@@ -14,6 +14,37 @@ import { WorkSessionsPage } from './features/worklog/WorkSessionsPage';
 import { AnalyticsPage } from './features/analytics/AnalyticsPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { setAuthToken } from './lib/api';
+
+/**
+ * Handles seamless web redirection if an OAuth callback lands on /auth/callback.
+ * Extracts token or errors and routes directly to the dashboard (or login/settings).
+ */
+function OAuthCallbackRedirect() {
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+  const error = searchParams.get('error');
+  const message = searchParams.get('message');
+  const action = searchParams.get('action');
+
+  useEffect(() => {
+    if (token) {
+      setAuthToken(token);
+    }
+  }, [token]);
+
+  if (error || message) {
+    const target = action === 'REGISTER' ? '/register' : action === 'LINK' ? '/settings' : '/login';
+    return <Navigate to={`${target}?${searchParams.toString()}`} replace />;
+  }
+
+  if (action === 'LINK') {
+    return <Navigate to="/settings?linked=google" replace />;
+  }
+
+  const destination = token ? `/dashboard?token=${encodeURIComponent(token)}` : '/dashboard';
+  return <Navigate to={destination} replace />;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,7 +66,8 @@ export function App() {
               {/* Public Auth Routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
-              <Route path="/auth/callback" element={<OAuthCallbackPage />} />
+              <Route path="/auth/callback" element={<OAuthCallbackRedirect />} />
+              <Route path="/oauth/callback" element={<OAuthCallbackRedirect />} />
 
               {/* Protected Application Routes */}
               <Route element={<ProtectedRoute />}>

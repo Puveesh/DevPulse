@@ -98,8 +98,7 @@ All application APIs are versioned under `/api/v1`.
 | `POST` | `/api/v1/auth/logout` | Authenticated | Clears `devpulse_token` cookie and invalidates client session |
 | `GET` | `/api/v1/auth/me` | Authenticated | Retrieves profile of currently authenticated user |
 | `POST` | `/api/v1/auth/google/start` | Public | Initiates Google OAuth 2.0 authorization code flow with PKCE |
-| `GET` | `/api/v1/auth/google/callback` | Public | Callback endpoint receiving authorization code from Google |
-| `POST` | `/api/v1/auth/google/exchange` | Public | Exchanges single-use ticket and PKCE verifier for JWT session |
+| `GET` | `/api/v1/auth/google/callback` | Public | Callback endpoint receiving authorization code from Google & redirecting to frontend dashboard |
 
 ### Documentation
 - OpenAPI Spec: `http://localhost:8081/api-docs`

@@ -1,15 +1,11 @@
 package com.devpulse.auth.oauth;
 
-import com.devpulse.auth.dto.AuthResponse;
-import com.devpulse.auth.dto.UserResponse;
 import com.devpulse.auth.oauth.dto.ChangePasswordRequest;
 import com.devpulse.auth.oauth.dto.GoogleAuthStartRequest;
 import com.devpulse.auth.oauth.dto.GoogleAuthStartResponse;
-import com.devpulse.auth.oauth.dto.GoogleExchangeRequest;
 import com.devpulse.auth.oauth.dto.GoogleLinkStatusResponse;
 import com.devpulse.auth.oauth.dto.SetPasswordRequest;
 import com.devpulse.common.BadRequestException;
-import com.devpulse.common.ConflictException;
 import com.devpulse.common.ResourceNotFoundException;
 import com.devpulse.common.UnauthorizedException;
 import com.devpulse.config.JwtProperties;
@@ -46,7 +42,6 @@ public class GoogleOAuthService {
     private final UserRepository userRepository;
     private final UserAuthIdentityRepository identityRepository;
     private final OAuthSessionRepository sessionRepository;
-    private final OAuthTicketRepository ticketRepository;
     private final JwtTokenProvider tokenProvider;
     private final JwtProperties jwtProperties;
     private final CookieUtils cookieUtils;
@@ -57,7 +52,6 @@ public class GoogleOAuthService {
                               UserRepository userRepository,
                               UserAuthIdentityRepository identityRepository,
                               OAuthSessionRepository sessionRepository,
-                              OAuthTicketRepository ticketRepository,
                               JwtTokenProvider tokenProvider,
                               JwtProperties jwtProperties,
                               CookieUtils cookieUtils,
@@ -67,7 +61,6 @@ public class GoogleOAuthService {
         this.userRepository = userRepository;
         this.identityRepository = identityRepository;
         this.sessionRepository = sessionRepository;
-        this.ticketRepository = ticketRepository;
         this.tokenProvider = tokenProvider;
         this.jwtProperties = jwtProperties;
         this.cookieUtils = cookieUtils;
@@ -141,11 +134,11 @@ public class GoogleOAuthService {
     }
 
     @Transactional
-    public String handleCallback(String code, String stateParam, String error, String errorDescription) {
+    public String handleCallback(String code, String stateParam, String error, String errorDescription, HttpServletResponse response) {
         log.info("Processing Google OAuth callback: stateParam={}, error={}", stateParam, error);
 
         if (stateParam == null || !stateParam.contains(":")) {
-            return buildErrorHtmlOrRedirect(null, "INVALID_STATE", "Invalid or missing OAuth state parameter.", "WEB");
+            return buildErrorRedirect("INVALID_STATE", "Invalid or missing OAuth state parameter.", "LOGIN");
         }
 
         String[] parts = stateParam.split(":", 2);
@@ -153,32 +146,32 @@ public class GoogleOAuthService {
         try {
             sessionId = UUID.fromString(parts[0]);
         } catch (IllegalArgumentException e) {
-            return buildErrorHtmlOrRedirect(null, "INVALID_STATE", "Malformed OAuth session identifier.", "WEB");
+            return buildErrorRedirect("INVALID_STATE", "Malformed OAuth session identifier.", "LOGIN");
         }
         String stateToken = parts[1];
 
         Optional<OAuthSession> sessionOpt = sessionRepository.findById(sessionId);
         if (sessionOpt.isEmpty()) {
-            return buildErrorHtmlOrRedirect(null, "SESSION_NOT_FOUND", "OAuth session not found or expired.", "WEB");
+            return buildErrorRedirect("SESSION_NOT_FOUND", "OAuth session not found or expired.", "LOGIN");
         }
 
         OAuthSession session = sessionOpt.get();
-        String clientType = session.getClientType();
+        String action = session.getAction();
 
         if (session.isExpired()) {
             session.setStatus("EXPIRED");
             session.setGoogleCodeVerifier(null);
             sessionRepository.save(session);
-            return buildErrorHtmlOrRedirect(stateToken, "SESSION_EXPIRED", "The authentication session has timed out. Please try again.", clientType);
+            return buildErrorRedirect("SESSION_EXPIRED", "The authentication session has timed out. Please try again.", action);
         }
 
         if (!"PENDING".equals(session.getStatus())) {
-            return buildErrorHtmlOrRedirect(stateToken, "SESSION_ALREADY_USED", "This authentication request has already been processed.", clientType);
+            return buildErrorRedirect("SESSION_ALREADY_USED", "This authentication request has already been processed.", action);
         }
 
         // Validate opaque state token matches stored session state exactly
         if (!session.getState().equals(stateToken)) {
-            return buildErrorHtmlOrRedirect(stateToken, "STATE_MISMATCH", "OAuth security state mismatch.", clientType);
+            return buildErrorRedirect("STATE_MISMATCH", "OAuth security state mismatch.", action);
         }
 
         // Handle Google error responses (e.g. user cancelled)
@@ -187,14 +180,14 @@ public class GoogleOAuthService {
             session.setGoogleCodeVerifier(null);
             sessionRepository.save(session);
             String desc = (errorDescription != null && !errorDescription.isBlank()) ? errorDescription : "Google authentication was cancelled or denied.";
-            return buildErrorHtmlOrRedirect(stateToken, "GOOGLE_AUTH_DENIED", desc, clientType);
+            return buildErrorRedirect("GOOGLE_AUTH_DENIED", desc, action);
         }
 
         if (code == null || code.isBlank()) {
             session.setStatus("FAILED");
             session.setGoogleCodeVerifier(null);
             sessionRepository.save(session);
-            return buildErrorHtmlOrRedirect(stateToken, "MISSING_CODE", "Missing authorization code from Google.", clientType);
+            return buildErrorRedirect("MISSING_CODE", "Missing authorization code from Google.", action);
         }
 
         // Retrieve server-side Google PKCE verifier securely bound to this validated session
@@ -212,12 +205,11 @@ public class GoogleOAuthService {
             session.setStatus("FAILED");
             session.setGoogleCodeVerifier(null);
             sessionRepository.save(session);
-            return buildErrorHtmlOrRedirect(stateToken, "VERIFICATION_FAILED", ex.getMessage(), clientType);
+            return buildErrorRedirect("VERIFICATION_FAILED", ex.getMessage(), action);
         }
 
         // Apply strict login, register, and link rules
         User targetUser;
-        String action = session.getAction();
 
         try {
             if ("LOGIN".equals(action)) {
@@ -228,8 +220,8 @@ public class GoogleOAuthService {
                     session.setStatus("FAILED");
                     session.setGoogleCodeVerifier(null);
                     sessionRepository.save(session);
-                    return buildErrorHtmlOrRedirect(stateToken, "ACCOUNT_NOT_LINKED",
-                            "No DevPulse account is linked to this Google account (" + googleUser.email() + "). Please sign up with Google or log in using email/password and connect Google from Settings.", clientType);
+                    return buildErrorRedirect("ACCOUNT_NOT_LINKED",
+                            "No DevPulse account is linked to this Google account (" + googleUser.email() + "). Please sign up with Google or log in using email/password and connect Google from Settings.", action);
                 }
                 targetUser = identityOpt.get().getUser();
 
@@ -240,16 +232,16 @@ public class GoogleOAuthService {
                     session.setStatus("FAILED");
                     session.setGoogleCodeVerifier(null);
                     sessionRepository.save(session);
-                    return buildErrorHtmlOrRedirect(stateToken, "ACCOUNT_ALREADY_EXISTS",
-                            "An account is already linked to this Google account. Please use Continue with Google on the Sign In screen.", clientType);
+                    return buildErrorRedirect("ACCOUNT_ALREADY_EXISTS",
+                            "An account is already linked to this Google account. Please use Continue with Google on the Sign In screen.", action);
                 }
 
                 if (userRepository.existsByEmail(googleUser.email())) {
                     session.setStatus("FAILED");
                     session.setGoogleCodeVerifier(null);
                     sessionRepository.save(session);
-                    return buildErrorHtmlOrRedirect(stateToken, "EMAIL_ALREADY_REGISTERED",
-                            "An account already exists with email " + googleUser.email() + ". Please sign in with your password and connect Google in Settings.", clientType);
+                    return buildErrorRedirect("EMAIL_ALREADY_REGISTERED",
+                            "An account already exists with email " + googleUser.email() + ". Please sign in with your password and connect Google in Settings.", action);
                 }
 
                 // Create new DevPulse user using existing User model
@@ -276,7 +268,7 @@ public class GoogleOAuthService {
                     session.setStatus("FAILED");
                     session.setGoogleCodeVerifier(null);
                     sessionRepository.save(session);
-                    return buildErrorHtmlOrRedirect(stateToken, "UNAUTHORIZED", "Authentication required to link account.", clientType);
+                    return buildErrorRedirect("UNAUTHORIZED", "Authentication required to link account.", action);
                 }
 
                 targetUser = userRepository.findById(currentUserId)
@@ -288,8 +280,8 @@ public class GoogleOAuthService {
                     session.setStatus("FAILED");
                     session.setGoogleCodeVerifier(null);
                     sessionRepository.save(session);
-                    return buildErrorHtmlOrRedirect(stateToken, "GOOGLE_ALREADY_LINKED",
-                            "This Google account is already linked to another DevPulse user account.", clientType);
+                    return buildErrorRedirect("GOOGLE_ALREADY_LINKED",
+                            "This Google account is already linked to another DevPulse user account.", action);
                 }
 
                 // If not already linked to current user, save identity
@@ -307,7 +299,7 @@ public class GoogleOAuthService {
                 session.setStatus("FAILED");
                 session.setGoogleCodeVerifier(null);
                 sessionRepository.save(session);
-                return buildErrorHtmlOrRedirect(stateToken, "INVALID_ACTION", "Unknown action: " + action, clientType);
+                return buildErrorRedirect("INVALID_ACTION", "Unknown action: " + action, action);
             }
 
         } catch (Exception ex) {
@@ -315,73 +307,26 @@ public class GoogleOAuthService {
             session.setStatus("FAILED");
             session.setGoogleCodeVerifier(null);
             sessionRepository.save(session);
-            return buildErrorHtmlOrRedirect(stateToken, "OPERATION_FAILED", ex.getMessage(), clientType);
+            return buildErrorRedirect("OPERATION_FAILED", ex.getMessage(), action);
         }
 
-        // Generate single-use, short-lived ticket
-        byte[] ticketBytes = new byte[32];
-        SECURE_RANDOM.nextBytes(ticketBytes);
-        String rawTicket = "dpt_" + Base64.getUrlEncoder().withoutPadding().encodeToString(ticketBytes);
-        String ticketHash = sha256Hex(rawTicket);
-
-        OAuthTicket ticket = new OAuthTicket(
-                ticketHash,
-                targetUser.getId(),
-                action,
-                session.getCodeChallenge(),
-                Instant.now().plus(2, ChronoUnit.MINUTES)
-        );
-        ticketRepository.save(ticket);
-
+        // Authentication success: mark session completed
         session.setStatus("COMPLETED");
         session.setGoogleCodeVerifier(null);
         sessionRepository.save(session);
 
-        return buildSuccessHtmlOrRedirect(rawTicket, stateToken, action, clientType);
-    }
-
-    @Transactional
-    public AuthResponse exchangeTicket(GoogleExchangeRequest request, HttpServletResponse response) {
-        String ticketHash = sha256Hex(request.ticket());
-
-        OAuthTicket ticket = ticketRepository.findByTicketHash(ticketHash)
-                .orElseThrow(() -> new UnauthorizedException("Invalid or unrecognized authentication ticket."));
-
-        if (ticket.isConsumed()) {
-            throw new UnauthorizedException("Authentication ticket has already been used. Please authenticate again.");
-        }
-
-        if (ticket.isExpired()) {
-            throw new UnauthorizedException("Authentication ticket has expired. Please authenticate again.");
-        }
-
-        // Immediately consume ticket to prevent replay attacks
-        ticket.setConsumed(true);
-        ticketRepository.save(ticket);
-
-        // Validate PKCE code_challenge if present
-        if (ticket.getCodeChallenge() != null && !ticket.getCodeChallenge().isBlank()) {
-            if (request.codeVerifier() == null || !verifyPkce(request.codeVerifier(), ticket.getCodeChallenge())) {
-                throw new UnauthorizedException("PKCE verification failed: invalid code_verifier.");
-            }
-        }
-
-        User user = userRepository.findById(ticket.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + ticket.getUserId()));
-
-        String token = tokenProvider.generateTokenFromUserId(user.getId(), user.getEmail());
+        // Generate JWT token for authenticated web session
+        String token = tokenProvider.generateTokenFromUserId(targetUser.getId(), targetUser.getEmail());
         if (response != null) {
             cookieUtils.addAuthCookie(response, token);
         }
 
-        Optional<UserAuthIdentity> identity = identityRepository.findByUserIdAndProvider(user.getId(), "google");
-        UserResponse userResponse = UserResponse.fromUser(
-                user,
-                identity.isPresent(),
-                identity.map(UserAuthIdentity::getProviderEmail).orElse(null)
-        );
-
-        return AuthResponse.of(token, jwtProperties.getExpirationMs(), userResponse);
+        // Direct web application redirect: no desktop handoff page or ticket exchange
+        if ("LINK".equals(action)) {
+            return properties.getFrontendSettingsUrl() + "?linked=google";
+        } else {
+            return properties.getFrontendDashboardUrl() + "?token=" + urlEncode(token);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -492,69 +437,18 @@ public class GoogleOAuthService {
         }
     }
 
-    private String buildSuccessHtmlOrRedirect(String ticket, String state, String action, String clientType) {
-        String targetUrl = properties.getWebCallbackUri() + "?ticket=" + urlEncode(ticket) + "&state=" + urlEncode(state) + "&action=" + urlEncode(action);
-
-        return "<!DOCTYPE html>\n" +
-                "<html lang=\"en\">\n" +
-                "<head>\n" +
-                "  <meta charset=\"UTF-8\">\n" +
-                "  <meta http-equiv=\"refresh\" content=\"0;url=" + targetUrl + "\">\n" +
-                "  <title>DevPulse - Authentication Successful</title>\n" +
-                "  <style>\n" +
-                "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #090a0f; color: #e4e4e7; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }\n" +
-                "    .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 32px; max-width: 440px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }\n" +
-                "    .icon { width: 48px; height: 48px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; color: #3b82f6; font-size: 24px; }\n" +
-                "    h1 { font-size: 20px; font-weight: 600; margin: 0 0 8px 0; color: #ffffff; }\n" +
-                "    p { font-size: 14px; color: #a1a1aa; line-height: 1.5; margin: 0 0 20px 0; }\n" +
-                "    .btn { display: inline-block; background: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 14px; transition: background 0.2s; }\n" +
-                "    .btn:hover { background: #1d4ed8; }\n" +
-                "  </style>\n" +
-                "  <script>\n" +
-                "    window.onload = function() { window.location.href = '" + targetUrl + "'; };\n" +
-                "  </script>\n" +
-                "</head>\n" +
-                "<body>\n" +
-                "  <div class=\"card\">\n" +
-                "    <div class=\"icon\">&#10003;</div>\n" +
-                "    <h1>Authentication Successful</h1>\n" +
-                "    <p>Returning you to DevPulse. If your browser does not redirect automatically, click the button below.</p>\n" +
-                "    <a href=\"" + targetUrl + "\" class=\"btn\">Open DevPulse</a>\n" +
-                "  </div>\n" +
-                "</body>\n" +
-                "</html>";
-    }
-
-    private String buildErrorHtmlOrRedirect(String state, String error, String message, String clientType) {
-        String targetUrl = properties.getWebCallbackUri() + "?error=" + urlEncode(error) + "&message=" + urlEncode(message) + (state != null ? "&state=" + urlEncode(state) : "");
-
-        return "<!DOCTYPE html>\n" +
-                "<html lang=\"en\">\n" +
-                "<head>\n" +
-                "  <meta charset=\"UTF-8\">\n" +
-                "  <meta http-equiv=\"refresh\" content=\"1;url=" + targetUrl + "\">\n" +
-                "  <title>DevPulse - Authentication Notice</title>\n" +
-                "  <style>\n" +
-                "    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #090a0f; color: #e4e4e7; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }\n" +
-                "    .card { background: #18181b; border: 1px solid #3f3f46; border-radius: 12px; padding: 32px; max-width: 440px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }\n" +
-                "    .icon { width: 48px; height: 48px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; color: #ef4444; font-size: 24px; }\n" +
-                "    h1 { font-size: 20px; font-weight: 600; margin: 0 0 8px 0; color: #ffffff; }\n" +
-                "    p { font-size: 14px; color: #a1a1aa; line-height: 1.5; margin: 0 0 20px 0; }\n" +
-                "    .btn { display: inline-block; background: #3f3f46; color: #ffffff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 500; font-size: 14px; }\n" +
-                "  </style>\n" +
-                "  <script>\n" +
-                "    window.onload = function() { window.location.href = '" + targetUrl + "'; };\n" +
-                "  </script>\n" +
-                "</head>\n" +
-                "<body>\n" +
-                "  <div class=\"card\">\n" +
-                "    <div class=\"icon\">&#9888;</div>\n" +
-                "    <h1>Authentication Notice</h1>\n" +
-                "    <p>" + message + "</p>\n" +
-                "    <a href=\"" + targetUrl + "\" class=\"btn\">Return to DevPulse</a>\n" +
-                "  </div>\n" +
-                "</body>\n" +
-                "</html>";
+    private String buildErrorRedirect(String error, String message, String action) {
+        String baseUrl;
+        if ("LINK".equals(action)) {
+            baseUrl = properties.getFrontendSettingsUrl();
+        } else if ("ACCOUNT_ALREADY_EXISTS".equals(error) || "EMAIL_ALREADY_REGISTERED".equals(error)) {
+            baseUrl = properties.getFrontendLoginUrl();
+        } else if ("REGISTER".equals(action)) {
+            baseUrl = properties.getFrontendRegisterUrl();
+        } else {
+            baseUrl = properties.getFrontendLoginUrl();
+        }
+        return baseUrl + "?error=" + urlEncode(error) + "&message=" + urlEncode(message);
     }
 
     private static String urlEncode(String value) {

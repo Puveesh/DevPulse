@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateRandomString, generateCodeChallenge } from '../features/auth/pkce';
-import { initiateGoogleOAuth, exchangeOAuthTicket, cancelGoogleOAuth, isOAuthInProgress } from '../features/auth/googleAuth';
+import { initiateGoogleOAuth, cancelGoogleOAuth, clearOAuthProgress, isOAuthInProgress } from '../features/auth/googleAuth';
 import { getInitials } from '../lib/utils';
 import apiClient from '../lib/api';
 
@@ -143,49 +143,24 @@ describe('cancelGoogleOAuth', () => {
   });
 });
 
-describe('exchangeOAuthTicket', () => {
+describe('clearOAuthProgress', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
   });
 
-  it('sends ticket, codeVerifier, and state to backend exchange endpoint', async () => {
+  it('clears all devpulse oauth session items from sessionStorage', () => {
+    sessionStorage.setItem('devpulse_oauth_in_progress', 'true');
     sessionStorage.setItem('devpulse_oauth_verifier', 'test_verifier');
-    sessionStorage.setItem('devpulse_oauth_state', 'expected_state');
+    sessionStorage.setItem('devpulse_oauth_state', 'test_state');
+    sessionStorage.setItem('devpulse_oauth_action', 'LOGIN');
 
-    const mockPost = vi.mocked(apiClient.post);
-    mockPost.mockResolvedValueOnce({
-      data: {
-        success: true,
-        data: {
-          accessToken: 'jwt_token_xyz',
-          tokenType: 'Bearer',
-          expiresInMs: 86400000,
-          user: { id: 'u1', email: 'test@devpulse.io' },
-        },
-      },
-    } as any);
+    clearOAuthProgress();
 
-    const result = await exchangeOAuthTicket('dpt_ticket_123', 'expected_state');
-
-    expect(mockPost).toHaveBeenCalledWith('/auth/google/exchange', {
-      ticket: 'dpt_ticket_123',
-      codeVerifier: 'test_verifier',
-      state: 'expected_state',
-    });
-
-    expect(result.accessToken).toBe('jwt_token_xyz');
-    // Session storage should be cleaned up
+    expect(sessionStorage.getItem('devpulse_oauth_in_progress')).toBeNull();
     expect(sessionStorage.getItem('devpulse_oauth_verifier')).toBeNull();
-  });
-
-  it('throws an error if state does not match stored state', async () => {
-    sessionStorage.setItem('devpulse_oauth_verifier', 'test_verifier');
-    sessionStorage.setItem('devpulse_oauth_state', 'original_state');
-
-    await expect(exchangeOAuthTicket('dpt_ticket_123', 'tampered_state')).rejects.toThrow(
-      'OAuth security state verification mismatch'
-    );
+    expect(sessionStorage.getItem('devpulse_oauth_state')).toBeNull();
+    expect(sessionStorage.getItem('devpulse_oauth_action')).toBeNull();
   });
 });
 

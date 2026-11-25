@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { loginSchema, type LoginFormData } from './schemas';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
@@ -34,7 +34,9 @@ function GoogleIcon({ className = 'w-4 h-4' }: { className?: string }) {
 }
 
 export function LoginPage() {
-  const [serverError, setServerError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const oauthError = searchParams.get('message') || searchParams.get('error');
+  const [serverError, setServerError] = useState<string | null>(oauthError || null);
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
   const { login } = useAuth();
   const navigate = useNavigate();

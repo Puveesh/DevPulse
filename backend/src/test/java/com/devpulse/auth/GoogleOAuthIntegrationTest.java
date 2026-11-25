@@ -6,13 +6,10 @@ import com.devpulse.auth.oauth.GoogleTokenVerifier;
 import com.devpulse.auth.oauth.GoogleUserInfo;
 import com.devpulse.auth.oauth.OAuthSession;
 import com.devpulse.auth.oauth.OAuthSessionRepository;
-import com.devpulse.auth.oauth.OAuthTicket;
-import com.devpulse.auth.oauth.OAuthTicketRepository;
 import com.devpulse.auth.oauth.UserAuthIdentity;
 import com.devpulse.auth.oauth.UserAuthIdentityRepository;
 import com.devpulse.auth.oauth.dto.ChangePasswordRequest;
 import com.devpulse.auth.oauth.dto.GoogleAuthStartRequest;
-import com.devpulse.auth.oauth.dto.GoogleExchangeRequest;
 import com.devpulse.auth.oauth.dto.SetPasswordRequest;
 import com.devpulse.security.JwtTokenProvider;
 import com.devpulse.user.User;
@@ -48,6 +45,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -72,9 +71,6 @@ class GoogleOAuthIntegrationTest {
     private OAuthSessionRepository sessionRepository;
 
     @Autowired
-    private OAuthTicketRepository ticketRepository;
-
-    @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
@@ -85,7 +81,6 @@ class GoogleOAuthIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        ticketRepository.deleteAll();
         sessionRepository.deleteAll();
         identityRepository.deleteAll();
         userRepository.deleteAll();
@@ -106,7 +101,7 @@ class GoogleOAuthIntegrationTest {
     }
 
     @Test
-    void testGoogleLoginWhenNotLinkedFailsCleanlyWithoutSilentMerging() throws Exception {
+    void testGoogleLoginWhenNotLinkedRedirectsToLoginWithError() throws Exception {
         // Prepare pending session
         OAuthSession session = new OAuthSession("test-state", "WEB", "LOGIN", null, null, Instant.now().plus(10, ChronoUnit.MINUTES));
         session = sessionRepository.save(session);
@@ -117,19 +112,15 @@ class GoogleOAuthIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/google/callback")
                         .param("code", "auth-code-123")
                         .param("state", session.getId() + ":test-state"))
-                .andExpect(status().isOk())
-                .andExpect(result -> {
-                    String html = result.getResponse().getContentAsString();
-                    assertTrue(html.contains("ACCOUNT_NOT_LINKED"));
-                    assertTrue(html.contains("No DevPulse account is linked"));
-                });
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/login?error=ACCOUNT_NOT_LINKED")));
 
         // Verify no user was created
         assertFalse(userRepository.existsByEmail("unlinked@gmail.com"));
     }
 
     @Test
-    void testGoogleLoginWhenLinkedSucceedsAndIssuesTicket() throws Exception {
+    void testGoogleLoginWhenLinkedSucceedsAndRedirectsDirectlyToDashboard() throws Exception {
         // Create user and link Google identity
         User user = new User("developer@gmail.com", passwordEncoder.encode("Password123!"), "Google Developer");
         user = userRepository.save(user);
@@ -146,16 +137,13 @@ class GoogleOAuthIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/google/callback")
                         .param("code", "auth-code-123")
                         .param("state", session.getId() + ":valid-state"))
-                .andExpect(status().isOk())
-                .andExpect(result -> {
-                    String html = result.getResponse().getContentAsString();
-                    assertTrue(html.contains("Authentication Successful"));
-                    assertTrue(html.contains("dpt_"));
-                });
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/dashboard?token=")))
+                .andExpect(cookie().exists("devpulse_token"));
     }
 
     @Test
-    void testGoogleSignupCreatesUserAndIdentity() throws Exception {
+    void testGoogleSignupCreatesUserAndIdentityAndRedirectsToDashboard() throws Exception {
         OAuthSession session = new OAuthSession("signup-state", "WEB", "REGISTER", null, null, Instant.now().plus(10, ChronoUnit.MINUTES));
         session = sessionRepository.save(session);
 
@@ -165,12 +153,9 @@ class GoogleOAuthIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/google/callback")
                         .param("code", "auth-code-123")
                         .param("state", session.getId() + ":signup-state"))
-                .andExpect(status().isOk())
-                .andExpect(result -> {
-                    String html = result.getResponse().getContentAsString();
-                    assertTrue(html.contains("Authentication Successful"));
-                    assertTrue(html.contains("dpt_"));
-                });
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/dashboard?token=")))
+                .andExpect(cookie().exists("devpulse_token"));
 
         // Verify user and identity were created
         User createdUser = userRepository.findByEmail("newuser@gmail.com").orElse(null);
@@ -181,7 +166,7 @@ class GoogleOAuthIntegrationTest {
     }
 
     @Test
-    void testGoogleSignupWhenEmailAlreadyExistsRejectsWithoutDuplicate() throws Exception {
+    void testGoogleSignupWhenEmailAlreadyExistsRedirectsToLoginWithError() throws Exception {
         // User already registered via password
         User existingUser = new User("existing@devpulse.io", passwordEncoder.encode("Secret123!"), "Existing User");
         userRepository.save(existingUser);
@@ -195,43 +180,31 @@ class GoogleOAuthIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/google/callback")
                         .param("code", "auth-code-123")
                         .param("state", session.getId() + ":signup-state"))
-                .andExpect(status().isOk())
-                .andExpect(result -> {
-                    String html = result.getResponse().getContentAsString();
-                    assertTrue(html.contains("EMAIL_ALREADY_REGISTERED"));
-                });
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/login?error=EMAIL_ALREADY_REGISTERED")));
 
         // Verify Google identity was NOT silently linked
         assertFalse(identityRepository.existsByProviderAndProviderSubject("google", "google-sub-300"));
     }
 
     @Test
-    void testTicketExchangeSuccessAndSingleUseConstraint() throws Exception {
-        User user = new User("ticketuser@gmail.com", null, "Ticket User");
+    void testGoogleAccountLinkRedirectsToSettings() throws Exception {
+        User user = new User("linkuser@gmail.com", passwordEncoder.encode("Password123!"), "Link User");
         user = userRepository.save(user);
 
-        String rawTicket = "dpt_secret_ticket_123456789";
-        String ticketHash = GoogleOAuthService.sha256Hex(rawTicket);
+        OAuthSession session = new OAuthSession("link-state", "WEB", "LINK", null, null, user.getId(), Instant.now().plus(10, ChronoUnit.MINUTES));
+        session = sessionRepository.save(session);
 
-        OAuthTicket ticket = new OAuthTicket(ticketHash, user.getId(), "LOGIN", null, Instant.now().plus(2, ChronoUnit.MINUTES));
-        ticketRepository.save(ticket);
+        when(googleTokenVerifier.exchangeAndVerify(anyString(), anyString()))
+                .thenReturn(new GoogleUserInfo("google-sub-link", "linkuser@gmail.com", true, "Link User", null));
 
-        GoogleExchangeRequest request = new GoogleExchangeRequest(rawTicket, null, "any-state");
+        mockMvc.perform(get("/api/v1/auth/google/callback")
+                        .param("code", "auth-code-123")
+                        .param("state", session.getId() + ":link-state"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/settings?linked=google")));
 
-        // 1. First exchange should succeed and return JWT
-        mockMvc.perform(post("/api/v1/auth/google/exchange")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success", is(true)))
-                .andExpect(jsonPath("$.data.accessToken", notNullValue()))
-                .andExpect(jsonPath("$.data.user.email", is("ticketuser@gmail.com")));
-
-        // 2. Second exchange with same ticket must be rejected (single-use)
-        mockMvc.perform(post("/api/v1/auth/google/exchange")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
+        assertTrue(identityRepository.existsByProviderAndProviderSubject("google", "google-sub-link"));
     }
 
     @Test
@@ -251,7 +224,7 @@ class GoogleOAuthIntegrationTest {
     @Test
     void testSetPasswordForGoogleOnlyUserAndSubsequentPasswordLogin() throws Exception {
         User user = new User("googleuser@devpulse.io", null, "Google User");
-        user = userRepository.save(user);
+        userRepository.save(user);
 
         String jwt = jwtTokenProvider.generateTokenFromUserId(user.getId(), user.getEmail());
 
@@ -368,7 +341,7 @@ class GoogleOAuthIntegrationTest {
     }
 
     @Test
-    void testGoogleCallbackRetrievesVerifierFromServerSessionAndSuppliesToTokenVerifier() throws Exception {
+    void testGoogleCallbackRetrievesVerifierFromServerSessionAndRedirectsDirectlyToDashboard() throws Exception {
         User user = new User("pkce_server@gmail.com", passwordEncoder.encode("Password123!"), "Server PKCE User");
         user = userRepository.save(user);
 
@@ -386,12 +359,9 @@ class GoogleOAuthIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/google/callback")
                         .param("code", "auth-code-server")
                         .param("state", session.getId() + ":opaqueState123"))
-                .andExpect(status().isOk())
-                .andExpect(result -> {
-                    String html = result.getResponse().getContentAsString();
-                    assertTrue(html.contains("Authentication Successful"));
-                    assertTrue(html.contains("dpt_"));
-                });
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/dashboard?token=")))
+                .andExpect(cookie().exists("devpulse_token"));
 
         // Verify verifier was used and invalidated from session
         OAuthSession updated = sessionRepository.findById(session.getId()).orElseThrow();
@@ -407,11 +377,8 @@ class GoogleOAuthIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/google/callback")
                         .param("code", "auth-code-123")
                         .param("state", session.getId() + ":wrongStateToken"))
-                .andExpect(status().isOk())
-                .andExpect(result -> {
-                    String html = result.getResponse().getContentAsString();
-                    assertTrue(html.contains("OAuth security state mismatch"));
-                });
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/login?error=STATE_MISMATCH")));
     }
 
     @Test
@@ -422,11 +389,8 @@ class GoogleOAuthIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/google/callback")
                         .param("code", "auth-code-123")
                         .param("state", session.getId() + ":expiredState"))
-                .andExpect(status().isOk())
-                .andExpect(result -> {
-                    String html = result.getResponse().getContentAsString();
-                    assertTrue(html.contains("authentication session has timed out"));
-                });
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/login?error=SESSION_EXPIRED")));
     }
 
     @Test
@@ -438,11 +402,8 @@ class GoogleOAuthIntegrationTest {
         mockMvc.perform(get("/api/v1/auth/google/callback")
                         .param("code", "auth-code-123")
                         .param("state", session.getId() + ":usedState"))
-                .andExpect(status().isOk())
-                .andExpect(result -> {
-                    String html = result.getResponse().getContentAsString();
-                    assertTrue(html.contains("already been processed"));
-                });
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", containsString("/login?error=SESSION_ALREADY_USED")));
     }
 
     @Test

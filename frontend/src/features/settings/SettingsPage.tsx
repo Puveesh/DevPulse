@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -83,7 +84,7 @@ const SUGGESTED_TECHNOLOGIES = [
 ];
 
 export function SettingsPage() {
-  const { user, updateProfile, updatePreferences, uploadAvatar, removeAvatar } = useAuth();
+  const { user, refreshProfile, updateProfile, updatePreferences, uploadAvatar, removeAvatar } = useAuth();
 
   // Mode toggles
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -102,6 +103,31 @@ export function SettingsPage() {
     title?: string;
     message: string;
   } | null>(null);
+
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const linked = searchParams.get('linked');
+    const oauthError = searchParams.get('error');
+    const oauthMessage = searchParams.get('message');
+
+    if (linked === 'google') {
+      setStatusNotification({
+        type: 'success',
+        title: 'Google Connected',
+        message: 'Your Google account has been successfully linked.',
+      });
+      refreshProfile().catch(() => {});
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (oauthError || oauthMessage) {
+      setStatusNotification({
+        type: 'error',
+        title: 'Connection Failed',
+        message: oauthMessage || `Failed to link account: ${oauthError}`,
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [searchParams, refreshProfile]);
 
   // Clipboard copy state
   const [isCopied, setIsCopied] = useState(false);

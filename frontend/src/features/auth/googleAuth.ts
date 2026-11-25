@@ -1,6 +1,6 @@
 import apiClient, { extractErrorMessage } from '../../lib/api';
 import { generateRandomString, generateCodeChallenge } from './pkce';
-import type { ApiResponse, AuthResponseData } from '../../types';
+import type { ApiResponse } from '../../types';
 
 export interface StartGoogleOAuthOptions {
   action: 'LOGIN' | 'REGISTER' | 'LINK';
@@ -27,6 +27,15 @@ export function cancelGoogleOAuth(reason?: string): void {
         },
       })
     );
+  }
+}
+
+export function clearOAuthProgress(): void {
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem('devpulse_oauth_in_progress');
+    sessionStorage.removeItem('devpulse_oauth_verifier');
+    sessionStorage.removeItem('devpulse_oauth_state');
+    sessionStorage.removeItem('devpulse_oauth_action');
   }
 }
 
@@ -73,41 +82,5 @@ export async function initiateGoogleOAuth({ action, onStart, onError }: StartGoo
       console.error('Google OAuth initialization failed:', message);
     }
     throw new Error(message);
-  }
-}
-
-export async function exchangeOAuthTicket(ticket: string, state: string): Promise<AuthResponseData> {
-  const codeVerifier = (typeof window !== 'undefined' && sessionStorage.getItem('devpulse_oauth_verifier')) || '';
-  const savedState = typeof window !== 'undefined' ? sessionStorage.getItem('devpulse_oauth_state') : null;
-
-  // Validate state matching if stored
-  if (savedState && savedState !== state) {
-    cancelGoogleOAuth('OAuth security state verification mismatch. Authentication aborted.');
-    throw new Error('OAuth security state verification mismatch. Authentication aborted.');
-  }
-
-  try {
-    const res = await apiClient.post<ApiResponse<AuthResponseData>>('/auth/google/exchange', {
-      ticket,
-      codeVerifier,
-      state,
-    });
-
-    if (!res.data?.success || !res.data.data) {
-      throw new Error(res.data?.message || 'Failed to exchange authentication ticket.');
-    }
-
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('devpulse_oauth_in_progress');
-      sessionStorage.removeItem('devpulse_oauth_verifier');
-      sessionStorage.removeItem('devpulse_oauth_state');
-      sessionStorage.removeItem('devpulse_oauth_action');
-    }
-
-    return res.data.data;
-  } catch (err) {
-    const msg = extractErrorMessage(err);
-    cancelGoogleOAuth(msg);
-    throw new Error(msg);
   }
 }

@@ -14,13 +14,13 @@ DevPulse uses a **dual-method, centralized authentication model**:
 - **Centralized Spring Boot Token Issuance:** Google authentication tokens are processed, validated, and mapped exclusively by your local Spring Boot backend. No third-party BaaS (Firebase, Supabase, Auth0) is used.
 - **Stable Identity Mapping:** Accounts are linked using Google's immutable subject identifier (`sub`), never mutable email strings alone.
 - **No Silent Account Merging:** An existing email/password account is never automatically merged with an incoming Google login. Users must explicitly link Google from the DevPulse Settings page.
-- **Web Authorization Code Flow with PKCE:**
-  1. Frontend creates cryptographic PKCE code verifier and code challenge, then calls `/api/v1/auth/google/start`.
-  2. Spring Boot stores session state and redirects to Google's OAuth consent screen.
-  3. Google redirects back to Spring Boot `/api/v1/auth/google/callback`.
-  4. Spring Boot verifies the Google authorization code, checks account linkage rules, creates a short-lived, single-use ticket, and redirects the browser to the web frontend callback (`/auth/callback?ticket=...&state=...`).
-  5. The web frontend callback page exchanges the single-use ticket and client PKCE verifier for a secure JWT session at `/api/v1/auth/google/exchange`.
-  6. The authenticated user dashboard is loaded.
+- **Web Authorization Code Flow with Centralized JWT Issuance:**
+  1. Frontend calls `/api/v1/auth/google/start` (with action: `LOGIN`, `REGISTER`, or `LINK`).
+  2. Spring Boot creates `OAuthSession` with PKCE challenge for Google and returns Google's OAuth consent URL.
+  3. User completes Google authentication.
+  4. Google redirects back to Spring Boot `/api/v1/auth/google/callback`.
+  5. Spring Boot verifies authorization code with Google, checks account linkage rules, creates/links user, generates JWT session, sets HTTP-only `devpulse_token` cookie, and issues an HTTP 302 redirect directly to the frontend dashboard (`/dashboard?token=...`) or settings (`/settings?linked=google`).
+  6. The user lands directly on the DevPulse dashboard, fully authenticated.
 
 ---
 
@@ -78,7 +78,7 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URI=http://localhost:8081/api/v1/auth/google/callback
 
 # Web Application Callback URI
-WEB_CALLBACK_URI=http://localhost:5173/auth/callback
+WEB_CALLBACK_URI=http://localhost:5173/dashboard
 ```
 
 > **Security Note:** Never commit `GOOGLE_CLIENT_SECRET` to version control. The client secret is only known to the Spring Boot backend and is never exposed in frontend source code.
@@ -89,17 +89,14 @@ WEB_CALLBACK_URI=http://localhost:5173/auth/callback
 
 ```
 User clicks "Continue with Google"
-  └─> React generates PKCE verifier + challenge
-        └─> POST /api/v1/auth/google/start
-              └─> Spring Boot creates OAuthSession, returns Google auth URL
-                    └─> Browser redirects to accounts.google.com
-                          └─> User completes Google authentication
-                                └─> Google redirects to GET /api/v1/auth/google/callback?code=...&state=...
-                                      └─> Spring Boot verifies code with Google & issues single-use ticket
-                                            └─> Redirects browser to http://localhost:5173/auth/callback?ticket=...
-                                                  └─> React OAuthCallbackPage calls POST /api/v1/auth/google/exchange
-                                                        └─> Spring Boot validates ticket & PKCE, returns JWT
-                                                              └─> React saves session & navigates to /dashboard
+  └─> POST /api/v1/auth/google/start
+        └─> Spring Boot creates OAuthSession, returns Google auth URL
+              └─> Browser redirects to accounts.google.com
+                    └─> User completes Google authentication
+                          └─> Google redirects to GET /api/v1/auth/google/callback?code=...&state=...
+                                └─> Spring Boot verifies code, authenticates/creates user
+                                      └─> Sets HTTP-only auth cookie and issues 302 redirect
+                                            └─> Directly opens http://localhost:5173/dashboard
 ```
 
 ---

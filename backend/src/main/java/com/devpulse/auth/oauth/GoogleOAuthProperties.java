@@ -10,7 +10,7 @@ public class GoogleOAuthProperties {
     private String clientId = "";
     private String clientSecret = "";
     private String redirectUri = "http://localhost:8081/api/v1/auth/google/callback";
-    private String webCallbackUri = "http://localhost:5173/auth/callback";
+    private String webCallbackUri = "http://localhost:5173/dashboard";
 
     public String getClientId() {
         return clientId != null ? clientId.trim() : "";
@@ -40,11 +40,51 @@ public class GoogleOAuthProperties {
     }
 
     public String getWebCallbackUri() {
-        return webCallbackUri != null && !webCallbackUri.trim().isEmpty() ? webCallbackUri.trim() : "http://localhost:5173/auth/callback";
+        return webCallbackUri != null && !webCallbackUri.trim().isEmpty() ? webCallbackUri.trim() : "http://localhost:5173/dashboard";
     }
 
     public void setWebCallbackUri(String webCallbackUri) {
         this.webCallbackUri = webCallbackUri;
+    }
+
+    public String getFrontendBaseUrl() {
+        String uri = getWebCallbackUri();
+        if (uri == null || uri.isBlank()) {
+            return "http://localhost:5173";
+        }
+        uri = uri.trim();
+        int queryIdx = uri.indexOf('?');
+        if (queryIdx > 0) {
+            uri = uri.substring(0, queryIdx);
+        }
+        int hashIdx = uri.indexOf('#');
+        if (hashIdx > 0) {
+            uri = uri.substring(0, hashIdx);
+        }
+        uri = uri.replaceAll("/+$", "");
+        if (uri.endsWith("/auth/callback")) {
+            uri = uri.substring(0, uri.length() - "/auth/callback".length());
+        }
+        if (uri.endsWith("/dashboard")) {
+            uri = uri.substring(0, uri.length() - "/dashboard".length());
+        }
+        return uri.replaceAll("/+$", "");
+    }
+
+    public String getFrontendDashboardUrl() {
+        return getFrontendBaseUrl() + "/dashboard";
+    }
+
+    public String getFrontendSettingsUrl() {
+        return getFrontendBaseUrl() + "/settings";
+    }
+
+    public String getFrontendLoginUrl() {
+        return getFrontendBaseUrl() + "/login";
+    }
+
+    public String getFrontendRegisterUrl() {
+        return getFrontendBaseUrl() + "/register";
     }
 
     public boolean isConfigured() {

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User, ApiResponse, AuthResponseData, UpdateProfilePayload, UpdatePreferencesPayload, GoogleLinkStatus } from '../types';
 import apiClient, { setAuthToken, getAuthToken, extractErrorMessage } from '../lib/api';
-import { exchangeOAuthTicket } from '../features/auth/googleAuth';
 
 interface AuthContextType {
   user: User | null;
@@ -10,7 +9,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (data: { email: string; password: string }) => Promise<void>;
   register: (data: { email: string; password: string; displayName: string }) => Promise<void>;
-  exchangeGoogleTicket: (ticket: string, state: string) => Promise<AuthResponseData>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (payload: UpdateProfilePayload) => Promise<User>;
@@ -27,6 +25,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // Extract OAuth direct redirect token from URL before initial profile fetch
+  if (typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+      setAuthToken(urlToken);
+      urlParams.delete('token');
+      const newSearch = urlParams.toString() ? `?${urlParams.toString()}` : '';
+      window.history.replaceState({}, document.title, window.location.pathname + newSearch);
+    }
+  }
+
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(getAuthToken());
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -85,20 +95,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setToken(data.accessToken);
       }
       setUser(data.user);
-    } catch (err) {
-      throw new Error(extractErrorMessage(err));
-    }
-  };
-
-  const exchangeGoogleTicket = async (ticket: string, state: string): Promise<AuthResponseData> => {
-    try {
-      const data = await exchangeOAuthTicket(ticket, state);
-      if (data?.accessToken) {
-        setAuthToken(data.accessToken);
-        setToken(data.accessToken);
-      }
-      setUser(data.user);
-      return data;
     } catch (err) {
       throw new Error(extractErrorMessage(err));
     }
@@ -246,7 +242,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!user,
     login,
     register,
-    exchangeGoogleTicket,
     logout,
     refreshProfile,
     updateProfile,
