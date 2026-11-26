@@ -1,7 +1,12 @@
 # DevPulse Production Configuration Profile
 # Active when running with: -Dspring.profiles.active=prod or SPRING_PROFILES_ACTIVE=prod
 
+server:
+  shutdown: graceful
+
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   datasource:
     url: ${DB_URL:${DATABASE_URL:}}
     username: ${DB_USERNAME:}

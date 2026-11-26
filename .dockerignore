@@ -1,0 +1,31 @@
+# Frontend and web assets
+frontend/
+node_modules/
+
+# Local databases and backups
+*.sql
+devpulse_backup.sql
+docker-compose.yml
+
+# Build outputs
+target/
+**/target/
+dist/
+**/dist/
+
+# Git and metadata
+.git/
+.gitignore
+.gitattributes
+
+# Environment and secrets
+.env*
+*.local
+
+# Logs and IDEs
+*.log
+.idea/
+*.iml
+.vscode/
+.DS_Store
+*.md

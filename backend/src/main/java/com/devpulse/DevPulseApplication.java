@@ -15,10 +15,6 @@ public class DevPulseApplication {
         SpringApplication.run(DevPulseApplication.class, args);
     }
 
-    /**
-     * Loads key-value pairs from a local .env file into System properties if not already
-     * defined in the environment. Keeps local development smooth without exposing secrets to git.
-     */
     static void loadDotEnvIfPresent() {
         String[] potentialPaths = {
             ".env",
