@@ -29,8 +29,9 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     @Query("SELECT p FROM Project p WHERE p.userId = :userId AND " +
            "(:status IS NULL OR p.status = :status) AND " +
-           "(:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           "LOWER(p.description) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "(:search IS NULL OR :search = '' OR " +
+           "LOWER(p.name) LIKE LOWER(:search) OR " +
+           "LOWER(p.description) LIKE LOWER(:search))")
     Page<Project> findByUserIdWithFilters(
             @Param("userId") UUID userId,
             @Param("status") ProjectStatus status,

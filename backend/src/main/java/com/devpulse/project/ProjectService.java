@@ -45,7 +45,18 @@ public class ProjectService {
     @Transactional(readOnly = true)
     public Page<ProjectResponse> getProjects(UUID userId, ProjectStatus status, String search, Pageable pageable) {
         String trimmedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        Page<Project> projects = projectRepository.findByUserIdWithFilters(userId, status, trimmedSearch, pageable);
+        Page<Project> projects;
+
+        if (trimmedSearch == null) {
+            if (status == null) {
+                projects = projectRepository.findByUserId(userId, pageable);
+            } else {
+                projects = projectRepository.findByUserIdAndStatus(userId, status, pageable);
+            }
+        } else {
+            String searchPattern = "%" + trimmedSearch + "%";
+            projects = projectRepository.findByUserIdWithFilters(userId, status, searchPattern, pageable);
+        }
 
         return projects.map(p -> {
             Instant lastActivity = workSessionRepository
