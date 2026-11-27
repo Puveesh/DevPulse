@@ -1,6 +1,8 @@
+# syntax=docker/dockerfile:1
 # ==========================================
 # DevPulse Backend - Multi-stage Dockerfile
 # Optimized for Render Free Tier (512 MB RAM)
+# Resilient Maven Dependency Caching & Retries
 # ==========================================
 
 # ------------------------------------------
@@ -10,17 +12,29 @@ FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /build
 
-# Copy Maven descriptor to cache dependencies
+# Configure Maven/Wagon retry policies and network resilience
+ENV MAVEN_OPTS="-Dmaven.wagon.http.retryHandler.count=5 \
+                -Dmaven.wagon.http.retryHandler.requestSentKeepAlive=true \
+                -Dmaven.wagon.http.connectionTimeout=15000 \
+                -Dmaven.wagon.http.readTimeout=60000 \
+                -Dhttp.keepAlive=true"
+
+# Copy Maven descriptor first to isolate dependency resolution layer
 COPY pom.xml .
 
-# Pre-fetch project dependencies offline layer
-RUN mvn dependency:go-offline -B || true
+# Pre-fetch plugins and dependencies using Docker BuildKit cache mount.
+# Persisting /root/.m2 avoids re-downloading dependencies on every build,
+# mitigating Maven Central HTTP 429 (Too Many Requests) rate limits.
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn dependency:resolve-plugins dependency:resolve -B || true
 
-# Copy backend source code
+# Copy backend source code after dependencies have been resolved
 COPY src ./src
 
-# Build production Spring Boot executable JAR skipping tests
-RUN mvn clean package -DskipTests -B
+# Build production Spring Boot executable JAR skipping tests.
+# Mounts the same /root/.m2 cache to leverage already-downloaded artifacts.
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn clean package -DskipTests -B
 
 # ------------------------------------------
 # Stage 2: Runtime stage
