@@ -2,7 +2,7 @@
 # ==========================================
 # DevPulse Backend - Multi-stage Dockerfile
 # Optimized for Render Free Tier (512 MB RAM)
-# Resilient Maven Dependency Caching & Retries
+# Resilient Maven Dependency Caching & Google Mirror
 # ==========================================
 
 # ------------------------------------------
@@ -19,22 +19,26 @@ ENV MAVEN_OPTS="-Dmaven.wagon.http.retryHandler.count=5 \
                 -Dmaven.wagon.http.readTimeout=60000 \
                 -Dhttp.keepAlive=true"
 
-# Copy Maven descriptor first to isolate dependency resolution layer
-COPY pom.xml .
+# Copy Maven descriptor and mirror settings first to isolate dependency resolution layer
+COPY pom.xml settings.xml ./
 
-# Pre-fetch plugins and dependencies using Docker BuildKit cache mount.
+# Also copy mirror configuration into global Maven settings so any Maven command automatically uses it
+RUN cp settings.xml /usr/share/maven/conf/settings.xml
+
+# Pre-fetch plugins and dependencies using Docker BuildKit cache mount and Google mirror.
 # Persisting /root/.m2 avoids re-downloading dependencies on every build,
-# mitigating Maven Central HTTP 429 (Too Many Requests) rate limits.
+# and routing through Google's Maven Central mirror prevents HTTP 429 rate limits.
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn dependency:resolve-plugins dependency:resolve -B || true
+    mvn -s settings.xml dependency:resolve-plugins dependency:resolve -B || true
 
 # Copy backend source code after dependencies have been resolved
 COPY src ./src
 
 # Build production Spring Boot executable JAR skipping tests.
 # Mounts the same /root/.m2 cache to leverage already-downloaded artifacts.
+# Fails normally if dependencies cannot be downloaded or compilation fails.
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn clean package -DskipTests -B
+    mvn -s settings.xml clean package -DskipTests -B
 
 # ------------------------------------------
 # Stage 2: Runtime stage
